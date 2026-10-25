@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#173e35">
     <meta name="referrer" content="no-referrer">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-OgXLflOKGs2tg/7iXYRqhfYGgfazouW/1Mf98vVxyYE='; style-src 'sha256-Iaree3b4uKPe957yQSHK9uw6Rst3QbGm+xw2Gk56+74='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-nNVlV8h1PcW8J0GHZxElm9QdbqYNsbg7lKU0D6yV/+Y='; style-src 'sha256-7g7uNj0bbyZw3xGI2o9CgDsn31A6NmmYuZh7J1FkuyU='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>HIGHT | 今いる場所の標高</title>
     <!-- HIGHT:STYLE --><style>
 @charset "UTF-8";
 :root{font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#173e35;background:#f5f6f0;font-synthesis:none;color-scheme:light}
 *{box-sizing:border-box}body{margin:0}.app{max-width:520px;margin:auto;padding:30px 24px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{font-size:29px;font-weight:900;letter-spacing:2px;color:inherit;text-decoration:none}.brand-dot{color:#da784e}.tag{font-size:10px;letter-spacing:.08em;color:#65766c}.intro{margin:53px 0 30px}.eyebrow{font-size:10px;letter-spacing:.18em;color:#727f65;font-weight:700}h1{font-size:32px;line-height:1.55;letter-spacing:.035em;margin:15px 0} .intro>p:last-child{font-size:12px;color:#66736b;line-height:1.8}.measurement{position:relative;isolation:isolate;overflow:hidden;background:#e8eee3;border:1px solid #dbe3d5;border-radius:24px;text-align:center;padding:35px 22px 23px}.measurement h2{position:relative;font-size:13px;letter-spacing:.15em;font-weight:500;margin:0 0 16px}.reading{position:relative;display:flex;justify-content:center;align-items:baseline;gap:10px;min-height:105px}#altitude{font-size:clamp(48px,15vw,78px);font-weight:600;letter-spacing:-.05em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;max-width:90%}.unit{font-size:22px;color:#687e6b}.status{position:relative;font-size:12px;color:#52694f;min-height:18px;margin:6px 0 20px}.detail{position:relative;font-size:11px;color:#52694f;margin:6px 0}.mountains{position:absolute;inset:0;z-index:-1;opacity:.4;overflow:hidden}.mountains span{position:absolute;width:260px;height:260px;background:#cbd9bf;transform:rotate(45deg);border-radius:18px;left:-100px;top:180px}.mountains span:nth-child(2){left:110px;top:190px;background:#d5dfcb}.mountains span:nth-child(3){left:270px;top:140px;background:#dbe4d2}button{position:relative;width:100%;border:0;border-radius:14px;background:#173e35;color:#fff;padding:18px 12px;font:inherit;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;min-height:56px}button:hover{background:#245448}button:focus-visible,a:focus-visible{outline:3px solid #cc6a3b;outline-offset:4px}button:disabled{opacity:.7;cursor:wait}button span:first-child{font-size:22px;vertical-align:-2px;margin-right:7px}.hint{font-size:10px;color:#576b54;margin:14px 0 0}.privacy{display:flex;gap:12px;margin-top:27px}.privacy>span{font-size:25px}.privacy h2{font-size:12px;line-height:1.8;margin:0 0 5px}.privacy p,.note{font-size:11px;line-height:1.9;color:#6c786f;margin:0}.note{margin-top:22px}.error{background:#fff0e9;color:#853d25;border:1px solid #ecc9b9;border-radius:14px;padding:16px;font-size:13px;line-height:1.8;margin-top:16px}footer{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #dfe4d8;margin-top:34px;padding-top:20px;font-size:12px;font-weight:700;letter-spacing:.1em}footer span{font-size:10px;font-weight:400;color:#7a857b;letter-spacing:0}[hidden]{display:none!important}@media(min-width:700px){.app{padding-top:45px}.intro{margin-top:60px}}@media(prefers-reduced-motion:no-preference){button{transition:background .2s}}
+
+.social{margin-top:32px}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.section-heading h2{font-size:19px;line-height:1.6;margin:0}.demo-badge{display:inline-block;background:#e9e1ce;color:#675431;font-size:10px;font-weight:600;letter-spacing:.03em;padding:4px 7px;border-radius:6px;white-space:nowrap;vertical-align:middle}.social-description{font-size:12px;line-height:1.9;color:#647064;margin:12px 0}.social-card{background:#fffdf7;border:1px solid #dfe4d8;border-radius:20px;padding:22px 18px;margin-top:16px}.social-card h3{font-size:15px;margin:0 0 18px}.social-card label{display:block;font-size:12px;line-height:1.8;margin:14px 0 8px}.social-card label span{color:#647064}.social-card input:not([type=checkbox]){display:block;width:100%;min-width:0;border:1px solid #c6d0bf;border-radius:10px;padding:13px 12px;font:inherit;font-size:16px;background:#fff;color:#173e35}.social-card input:focus-visible,summary:focus-visible{outline:3px solid #cc6a3b;outline-offset:3px}.social-card button{font-size:13px;padding:13px 10px;min-height:48px;margin-top:12px}.social-card .secondary{background:#e8eee3;color:#173e35}.social-card .secondary:hover{background:#d8e3d2}.caption{font-size:11px;color:#647064;line-height:1.9;margin:9px 0;overflow-wrap:anywhere}.feedback{font-size:12px;line-height:1.8;overflow-wrap:anywhere;color:#52694f;margin:12px 0 0}.feedback:empty{display:none}.invite-block{border-top:1px solid #e3e7dd;margin-top:20px;padding-top:12px}.invite-block>p:first-child{font-size:12px}.invite-block output{display:block;font-family:ui-monospace,monospace;font-size:clamp(12px,3.7vw,17px);letter-spacing:.02em;overflow-wrap:anywhere;padding:14px 10px;background:#f0f3eb;border-radius:10px}.social-card .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.toggle-row strong{display:block;font-size:13px;color:#173e35}.toggle-row input{appearance:none;flex-shrink:0;width:48px;height:28px;border-radius:20px;background:#bfc8bb;cursor:pointer;margin:0;position:relative}.toggle-row input:before{content:"";position:absolute;width:20px;height:20px;left:4px;top:4px;background:#fff;border-radius:50%}.toggle-row input:checked{background:#173e35}.toggle-row input:checked:before{left:24px}.social-card button:disabled{cursor:not-allowed;opacity:.45}.shared-preview{background:#e8eee3;border-radius:12px;padding:12px;margin-top:14px}.shared-preview>p:first-child{font-size:12px}.shared-preview>strong{font-size:30px}.social-card summary{font-size:12px;line-height:1.8;cursor:pointer;padding:12px 0;min-height:44px}.friends-list{list-style:none;margin:12px 0 0;padding:0}.friends-list li{border-top:1px solid #e1e6da;padding:16px 0 5px}.friend-heading{display:flex;justify-content:space-between;gap:10px;font-size:15px}
 
 </style><!-- /HIGHT:STYLE -->
   </head>
@@ -30,7 +32,42 @@
       </section>
       <noscript><p class="error">測定失敗：JavaScriptが無効です。ブラウザーの設定でJavaScriptを有効にして、ページを再読み込みしてください。</p></noscript>
       <div id="error" class="error" role="alert" hidden></div>
-      <aside class="privacy"><span aria-hidden="true">◇</span><div><h2>あなたの位置情報は、あなたの端末だけに。</h2><p>このアプリは取得した位置情報を外部サーバーに送信・保存しません。</p></div></aside>
+      <section class="social" aria-labelledby="social-title">
+        <div class="section-heading"><h2 id="social-title">友達と、同じ空の下。</h2><span class="demo-badge">SNS デモ</span></div>
+        <p class="social-description">この端末だけの体験版です。実際の友達登録・招待・データ同期・外部送信は行いません。</p>
+        <p id="storage-notice" class="social-description" role="status"></p>
+        <section class="social-card" aria-labelledby="profile-title">
+          <h3 id="profile-title">マイプロフィール</h3>
+          <form id="profile-form">
+            <label for="nickname">ニックネーム <span>（1〜20文字）</span></label>
+            <input id="nickname" name="nickname" maxlength="40" autocomplete="nickname" placeholder="例：そら" required>
+            <button class="secondary" type="submit">ニックネームを保存</button>
+          </form>
+          <p id="profile-feedback" class="feedback" role="status"></p>
+          <div class="invite-block"><p>あなたの招待コード <span class="demo-badge">デモ用</span></p><output id="invite-code">準備中</output><p class="caption">このブラウザー専用です。他の端末では登録できません。データ消去時はコードが変わります。</p></div>
+        </section>
+        <section class="social-card" aria-labelledby="sharing-title">
+          <h3 id="sharing-title">標高の共有</h3>
+          <label class="toggle-row" for="sharing-toggle"><span>共有を許可 <strong id="sharing-state">オフ</strong></span><input id="sharing-toggle" type="checkbox" role="switch" disabled></label>
+          <p class="caption">初期状態はオフ。オンにして「標高を共有」を押したときだけ、その時点の標高をデモの共有対象にします。自動更新はしません。</p>
+          <button id="share-altitude" type="button" disabled>標高を共有</button>
+          <p id="share-hint" class="caption">共有をオンにして、標高を測定してください。</p>
+          <p id="share-feedback" class="feedback" role="status" aria-live="polite"></p>
+          <div id="shared-preview" class="shared-preview" hidden><p>自分の共有プレビュー <span class="demo-badge">未送信</span></p><strong id="shared-value"></strong><p id="shared-time" class="caption"></p></div>
+        </section>
+        <section class="social-card" aria-labelledby="friends-title">
+          <h3 id="friends-title">友達の標高 <span class="demo-badge">サンプル</span></h3>
+          <p class="caption">一覧は架空の固定データです。実在する人の現在地や最新情報ではありません。</p>
+          <details><summary>招待コードで友達を追加（デモ）</summary>
+            <form id="friend-form"><label for="friend-code">招待コード</label><input id="friend-code" name="friend-code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例：DEMO-SORA" required><button class="secondary" type="submit">サンプルの友達を追加</button></form>
+            <p class="caption">試せるコード：DEMO-SORA / DEMO-YAMA<br>実際の友達のコードは照合できません。</p>
+          </details>
+          <p id="friend-feedback" class="feedback" role="status"></p>
+          <p id="friends-empty" class="caption">まだサンプルの友達がいません。招待コードを入力して体験できます。</p>
+          <ul id="friends-list" class="friends-list"></ul>
+        </section>
+      </section>
+      <aside class="privacy"><span aria-hidden="true">◇</span><div><h2>あなたの位置情報は、あなたの端末だけに。</h2><p>このアプリは取得した位置情報・標高を外部サーバーに送信・保存しません。プロフィールとサンプル友達はこのブラウザー内に保存します。</p></div></aside>
       <p class="note">標高は端末が取得した海抜高度の目安です。端末や周囲の環境によって取得できない場合や誤差があります。安全に関わる判断には使用しないでください。</p>
       <footer>HIGHT <span>足もとから、新しい発見。</span></footer>
     </main>
@@ -69,6 +106,7 @@ button.addEventListener("click", () => {
   if (measuring) return;
   const currentRequest = ++requestId;
   const active = () => measuring && currentRequest === requestId;
+  document.dispatchEvent(new Event("hight:measurement-reset"));
   altitude.textContent = "—";
   accuracy.hidden = true;
   measuredAt.hidden = true;
@@ -118,6 +156,7 @@ button.addEventListener("click", () => {
         }
         altitude.textContent = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
         statusText.textContent = "測定成功";
+        document.dispatchEvent(new CustomEvent("hight:measurement", { detail: { altitude: value, timestamp: position.timestamp } }));
         const uncertainty = position.coords.altitudeAccuracy;
         accuracy.textContent = Number.isFinite(uncertainty) && uncertainty >= 0
           ? `高度の精度：±${Math.ceil(uncertainty).toLocaleString("ja-JP")} m（端末の報告値）`
@@ -146,6 +185,133 @@ button.addEventListener("click", () => {
 // 読み込み・イベント登録が完了してからボタンを有効にする。
 statusText.textContent = "測定待機中：「標高を測定」を押してください";
 button.disabled = false;
+
+;
+// SNSは端末内デモ。測定値はメモリーだけに保持し、通信・永続保存しない。
+(() => {
+  'use strict';
+  const $ = selector => document.querySelector(selector);
+  const key = 'hight.social-demo.v1';
+  const catalog = {
+    'DEMO-SORA': { name: 'そら', altitude: 124, updated: '2026-10-25T09:00:00+09:00' },
+    'DEMO-YAMA': { name: 'やま', altitude: 862, updated: '2026-10-24T15:30:00+09:00' },
+  };
+  let profile = { nickname: '', code: '', friends: [] };
+  let storageAvailable = true;
+  let latest = null;
+  let shared = null;
+  const format = value => new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(value);
+  const time = value => new Date(value).toLocaleString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  function storageWarning() {
+    storageAvailable = false;
+    $('#storage-notice').textContent = 'ブラウザー内に保存できません。今の画面では利用できますが、再読み込みするとプロフィール・コード・友達はリセットされます。';
+  }
+  function persist() {
+    if (!storageAvailable) return;
+    try { localStorage.setItem(key, JSON.stringify(profile)); } catch { storageWarning(); }
+  }
+  try {
+    const stored = JSON.parse(localStorage.getItem(key) || 'null');
+    if (stored && typeof stored === 'object') {
+      profile.nickname = typeof stored.nickname === 'string' ? [...stored.nickname.trim()].slice(0, 20).join('') : '';
+      profile.code = typeof stored.code === 'string' && /^HIGHT-[A-F0-9]{16}$/.test(stored.code) ? stored.code : '';
+      profile.friends = Array.isArray(stored.friends) ? [...new Set(stored.friends.filter(code => Object.hasOwn(catalog, code)))] : [];
+    }
+  } catch { storageWarning(); }
+  if (!profile.code) {
+    const bytes = new Uint8Array(8);
+    // 認証情報ではなく、このブラウザー用のデモ識別子。
+    if (globalThis.crypto && typeof crypto.getRandomValues === 'function') crypto.getRandomValues(bytes);
+    else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    profile.code = 'HIGHT-' + Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+  persist();
+  $('#nickname').value = profile.nickname;
+  $('#invite-code').textContent = profile.code;
+  $('#profile-feedback').textContent = profile.nickname ? `登録中：${profile.nickname}` : 'ニックネームを登録してください。';
+
+  $('#profile-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const name = $('#nickname').value.trim();
+    if (!name || [...name].length > 20) {
+      $('#profile-feedback').textContent = 'ニックネームは空白以外の1〜20文字で入力してください。';
+      return;
+    }
+    profile.nickname = name;
+    persist();
+    $('#nickname').value = name;
+    $('#profile-feedback').textContent = `${name} を${storageAvailable ? 'このブラウザーに保存しました' : 'この画面に登録しました（保存不可）'}。`;
+  });
+
+  function renderFriends() {
+    $('#friends-list').replaceChildren();
+    $('#friends-empty').hidden = profile.friends.length > 0;
+    for (const code of profile.friends) {
+      const friend = catalog[code];
+      const li = document.createElement('li');
+      const heading = document.createElement('div');
+      heading.className = 'friend-heading';
+      const name = document.createElement('strong');
+      name.textContent = friend.name;
+      const value = document.createElement('strong');
+      value.textContent = `${format(friend.altitude)} m`;
+      heading.append(name, value);
+      const updated = document.createElement('p');
+      updated.className = 'caption';
+      updated.textContent = `最終更新（架空）：${time(friend.updated)}`;
+      li.append(heading, updated);
+      $('#friends-list').append(li);
+    }
+  }
+  $('#friend-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const code = $('#friend-code').value.trim().toUpperCase();
+    let message;
+    if (code === profile.code) message = '自分の招待コードは追加できません。サンプルコードを使ってください。';
+    else if (!Object.hasOwn(catalog, code)) message = 'デモでは DEMO-SORA / DEMO-YAMA のみ使えます。実際の招待コードの検索・友達登録はできません。';
+    else if (profile.friends.includes(code)) message = 'このサンプルの友達はすでに追加されています。';
+    else {
+      profile.friends.push(code);
+      persist();
+      renderFriends();
+      message = `${catalog[code].name} のサンプルを追加しました。実際の友達登録や同期は行っていません。`;
+      $('#friend-code').value = '';
+    }
+    $('#friend-feedback').textContent = message;
+  });
+  function renderSharing() {
+    const enabled = $('#sharing-toggle').checked;
+    $('#sharing-state').textContent = enabled ? 'オン（デモ）' : 'オフ';
+    $('#share-altitude').disabled = !enabled || !latest;
+    $('#share-hint').textContent = !enabled ? '共有はオフです。オンにしても自動共有はされません。' : !latest ? '標高を測定してから共有できます。' : '測定済みの標高だけを端末内のプレビューに反映します。位置情報は送信しません。';
+    $('#shared-preview').hidden = !shared;
+    if (shared) {
+      $('#shared-value').textContent = `${format(shared.altitude)} m`;
+      $('#shared-time').textContent = `測定：${time(shared.timestamp)} ／ 共有操作：${time(shared.sharedAt)}`;
+    }
+  }
+  $('#sharing-toggle').checked = false;
+  $('#sharing-toggle').disabled = false;
+  $('#sharing-toggle').addEventListener('change', () => {
+    if (!$('#sharing-toggle').checked) shared = null;
+    $('#share-feedback').textContent = $('#sharing-toggle').checked ? '共有をオンにしました。まだ共有していません。' : '共有をオフにし、共有プレビューを消去しました。';
+    renderSharing();
+  });
+  document.addEventListener('hight:measurement-reset', () => { latest = null; renderSharing(); });
+  document.addEventListener('hight:measurement', event => {
+    if (!Number.isFinite(event.detail.altitude)) return;
+    latest = { altitude: event.detail.altitude, timestamp: event.detail.timestamp };
+    renderSharing();
+  });
+  $('#share-altitude').addEventListener('click', () => {
+    if (!$('#sharing-toggle').checked || !latest) return;
+    shared = { ...latest, sharedAt: Date.now() };
+    $('#share-feedback').textContent = 'デモの共有プレビューを更新しました。端末内だけの表示で、友達への送信・データ同期はしていません。';
+    renderSharing();
+  });
+  renderFriends();
+  renderSharing();
+})();
 
 </script><!-- /HIGHT:SCRIPT -->
   </body>

@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
-const script = '\n' + fs.readFileSync(path.join(root, 'app.js'), 'utf8') + '\n';
+const script = '\n' + ['app.js', 'sns.js'].map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n;\n') + '\n';
 const style = '\n' + fs.readFileSync(path.join(root, 'style.css'), 'utf8') + '\n';
 if (/<\/script/i.test(script) || /<\/style/i.test(style)) throw Error('埋め込みを終了するタグが含まれています');
 const hash = text => createHash('sha256').update(text).digest('base64');

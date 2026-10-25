@@ -32,6 +32,7 @@ button.addEventListener("click", () => {
   if (measuring) return;
   const currentRequest = ++requestId;
   const active = () => measuring && currentRequest === requestId;
+  document.dispatchEvent(new Event("hight:measurement-reset"));
   altitude.textContent = "—";
   accuracy.hidden = true;
   measuredAt.hidden = true;
@@ -81,6 +82,7 @@ button.addEventListener("click", () => {
         }
         altitude.textContent = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
         statusText.textContent = "測定成功";
+        document.dispatchEvent(new CustomEvent("hight:measurement", { detail: { altitude: value, timestamp: position.timestamp } }));
         const uncertainty = position.coords.altitudeAccuracy;
         accuracy.textContent = Number.isFinite(uncertainty) && uncertainty >= 0
           ? `高度の精度：±${Math.ceil(uncertainty).toLocaleString("ja-JP")} m（端末の報告値）`

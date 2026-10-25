@@ -1,0 +1,104 @@
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const baseURL = process.env.HIGHT_TEST_URL || 'http://127.0.0.1:8000';
+(async () => {
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] });
+  try {
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true });
+    await context.addInitScript(() => {
+      window.geoCalls = 0; window.mockAltitude = 100;
+      Object.defineProperty(navigator, 'permissions', { value: { query: async () => ({ state: 'granted' }) } });
+      Object.defineProperty(navigator, 'geolocation', { value: { getCurrentPosition(ok, fail) {
+        window.geoCalls++;
+        if (window.mockAltitude === null) fail({ code: 2 });
+        else ok({ coords: { altitude: window.mockAltitude, altitudeAccuracy: 2 }, timestamp: Date.now() });
+      } } });
+    });
+    const page = await context.newPage();
+    const errors = [], outgoing = [];
+    page.on('pageerror', e => errors.push(e.message));
+    page.on('request', r => { if (r.url() !== baseURL + '/') outgoing.push(r.url()); });
+    await page.goto(baseURL);
+    assert.equal(await page.locator('#sharing-toggle').isChecked(), false);
+    assert.equal(await page.locator('#share-altitude').isDisabled(), true);
+    assert.equal(await page.locator('#friends-list li').count(), 0);
+    const code = await page.locator('#invite-code').innerText();
+    assert.match(code, /^HIGHT-[A-F0-9]{16}$/);
+    console.log('PASS 初期オフ・空の友達一覧・専用コード');
+    await page.locator('#nickname').fill('  そら  ');
+    await page.locator('#profile-form button').click();
+    assert.match(await page.locator('#profile-feedback').innerText(), /そら.*保存/);
+    await page.locator('#nickname').fill('   ');
+    await page.locator('#profile-form button').click();
+    assert.match(await page.locator('#profile-feedback').innerText(), /1〜20文字/);
+    await page.locator('#nickname').fill('a'.repeat(21));
+    await page.locator('#profile-form button').click();
+    assert.match(await page.locator('#profile-feedback').innerText(), /1〜20文字/);
+    await page.locator('#nickname').fill('<b>ゆき</b>');
+    await page.locator('#profile-form button').click();
+    assert.equal(await page.locator('#profile-feedback b').count(), 0);
+    console.log('PASS ニックネーム登録・変更・入力検証・HTMLを実行しない');
+    await page.locator('summary').click();
+    for (const [input, expected] of [[code, /自分の/], ['UNKNOWN', /のみ使えます/], ['__proto__', /のみ使えます/], ['demo-sora', /サンプルを追加/], ['DEMO-SORA', /すでに/], ['DEMO-YAMA', /サンプルを追加/]]) {
+      await page.locator('#friend-code').fill(input);
+      await page.locator('#friend-form button').click();
+      assert.match(await page.locator('#friend-feedback').innerText(), expected);
+    }
+    assert.equal(await page.locator('#friends-list li').count(), 2);
+    assert.match(await page.locator('#friends-list').innerText(), /124 m.*最終更新（架空）/s);
+    console.log('PASS サンプル追加・自己コード/未知コード/重複の拒否・標高と更新日時');
+    await page.locator('#sharing-toggle').check();
+    assert.equal(await page.locator('#share-altitude').isDisabled(), true);
+    assert.equal(await page.evaluate(() => window.geoCalls), 0);
+    await page.locator('#measure').click();
+    assert.equal(await page.locator('#status').innerText(), '測定成功');
+    assert.equal(await page.locator('#shared-preview').isVisible(), false);
+    await page.locator('#share-altitude').click();
+    assert.equal(await page.locator('#shared-value').innerText(), '100 m');
+    assert.match(await page.locator('#share-feedback').innerText(), /送信・データ同期はしていません/);
+    await page.evaluate(() => { window.mockAltitude = 200; });
+    await page.locator('#measure').click();
+    assert.equal(await page.locator('#shared-value').innerText(), '100 m');
+    await page.locator('#share-altitude').click();
+    assert.equal(await page.locator('#shared-value').innerText(), '200 m');
+    console.log('PASS 共有操作前は未共有・明示的な操作でのみスナップショット更新');
+    await page.evaluate(() => { window.mockAltitude = null; });
+    await page.locator('#measure').click();
+    assert.equal(await page.locator('#share-altitude').isDisabled(), true);
+    await page.locator('#sharing-toggle').uncheck();
+    assert.equal(await page.locator('#shared-preview').isVisible(), false);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('hight.social-demo.v1')));
+    assert.deepEqual(Object.keys(stored).sort(), ['code', 'friends', 'nickname']);
+    console.log('PASS 測定失敗時の共有禁止・オフ時消去・標高は永続保存しない');
+    await page.locator('#sharing-toggle').check();
+    await page.reload();
+    assert.equal(await page.locator('#sharing-toggle').isChecked(), false);
+    assert.equal(await page.locator('#invite-code').innerText(), code);
+    assert.equal(await page.locator('#nickname').inputValue(), '<b>ゆき</b>');
+    assert.equal(await page.locator('#friends-list li').count(), 2);
+    assert.equal(await page.locator('#shared-preview').isVisible(), false);
+    assert.equal(await page.evaluate(() => window.geoCalls), 0);
+    console.log('PASS プロフィール/友達/コードの再読込・共有はオフに戻る');
+    for (const width of [320, 375, 430]) {
+      await page.setViewportSize({ width, height: 812 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    }
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.screenshot({ path: '/tmp/hight-social.png', fullPage: true });
+    assert.deepEqual(errors, []); assert.deepEqual(outgoing, []);
+    console.log('PASS 320/375/430pxで横はみ出しなし・外部通信と実行時エラーなし');
+    const unavailable = await browser.newPage();
+    await unavailable.addInitScript(() => Object.defineProperty(window, 'localStorage', { get() { throw Error('blocked'); } }));
+    await unavailable.goto(baseURL);
+    assert.match(await unavailable.locator('#storage-notice').innerText(), /保存できません/);
+    assert.equal(await unavailable.locator('#measure').isEnabled(), true);
+    assert.match(await unavailable.locator('#invite-code').innerText(), /^HIGHT-/);
+    console.log('PASS 保存不可でも測定とデモの操作が可能');
+    const corrupt = await browser.newPage();
+    await corrupt.addInitScript(() => localStorage.setItem('hight.social-demo.v1', JSON.stringify({ nickname: 42, code: 'bad', friends: ['__proto__', 'DEMO-SORA', 'DEMO-SORA'] })));
+    await corrupt.goto(baseURL);
+    assert.equal(await corrupt.locator('#friends-list li').count(), 1);
+    assert.match(await corrupt.locator('#invite-code').innerText(), /^HIGHT-[A-F0-9]{16}$/);
+    console.log('PASS 保存データの検証・不正/重複値の除外');
+  } finally { await browser.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });
