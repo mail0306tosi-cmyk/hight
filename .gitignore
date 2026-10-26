@@ -1,0 +1,6 @@
+node_modules/
+.cache/
+*-debug.log
+.firebase/
+.firebase-emulator/
+test-results/

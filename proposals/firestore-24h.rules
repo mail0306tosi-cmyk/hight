@@ -1,0 +1,84 @@
+// 検討専用。firebase.jsonから参照せず、本番適用しない。固定24h案。
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function own(uid) { return verified() && request.auth.uid == uid; }
+    function validUid(uid) { return uid is string && uid.matches('^[A-Za-z0-9_-]{1,128}$'); }
+    function approved(a, b) {
+      return (exists(/databases/$(database)/documents/connections/$(a + '~' + b)) &&
+        get(/databases/$(database)/documents/connections/$(a + '~' + b)).data.status == 'accepted') ||
+        (exists(/databases/$(database)/documents/connections/$(b + '~' + a)) &&
+        get(/databases/$(database)/documents/connections/$(b + '~' + a)).data.status == 'accepted');
+    }
+    function publicProfile(data) {
+      return data.keys().hasOnly(['nickname']) && data.keys().hasAll(['nickname']) &&
+        data.nickname is string && data.nickname.size() >= 1 && data.nickname.size() <= 20;
+    }
+    match /profiles/{uid} {
+      // 旧形式にコードが残る間は、友達にも文書全体を公開しない。
+      allow get: if own(uid) || (verified() && publicProfile(resource.data) && approved(request.auth.uid, uid));
+      allow list: if false;
+      allow create: if own(uid) && validUid(uid) && publicProfile(request.resource.data) &&
+        getAfter(/databases/$(database)/documents/privateProfiles/$(uid)).data.inviteCode is string;
+      allow update: if own(uid) && publicProfile(request.resource.data) &&
+        (!('inviteCode' in resource.data) ||
+          getAfter(/databases/$(database)/documents/privateProfiles/$(uid)).data.inviteCode == resource.data.inviteCode);
+      allow delete: if false;
+    }
+    match /privateProfiles/{uid} {
+      allow get: if own(uid);
+      allow list: if false;
+      allow create: if own(uid) && validUid(uid) &&
+        request.resource.data.keys().hasOnly(['inviteCode']) &&
+        request.resource.data.inviteCode is string && request.resource.data.inviteCode.matches('^[A-F0-9]{32}$') &&
+        publicProfile(getAfter(/databases/$(database)/documents/profiles/$(uid)).data) &&
+        (!exists(/databases/$(database)/documents/profiles/$(uid)) ||
+          !('inviteCode' in get(/databases/$(database)/documents/profiles/$(uid)).data) ||
+          get(/databases/$(database)/documents/profiles/$(uid)).data.inviteCode == request.resource.data.inviteCode) &&
+        getAfter(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.uid == uid;
+      allow update, delete: if false;
+    }
+    match /invites/{code} {
+      allow get: if verified();
+      allow list: if false;
+      allow create: if verified() && code.matches('^[A-F0-9]{32}$') &&
+        request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == request.auth.uid &&
+        getAfter(/databases/$(database)/documents/privateProfiles/$(request.auth.uid)).data.inviteCode == code;
+      allow update, delete: if false;
+    }
+    match /connections/{id} {
+      allow read: if verified() && request.auth.uid in resource.data.participants;
+      allow create: if verified() &&
+        request.resource.data.keys().hasOnly(['sender', 'recipient', 'participants', 'status', 'createdAt', 'updatedAt']) &&
+        request.resource.data.keys().hasAll(['sender', 'recipient', 'participants', 'status', 'createdAt', 'updatedAt']) &&
+        request.resource.data.sender == request.auth.uid && validUid(request.resource.data.sender) &&
+        validUid(request.resource.data.recipient) && request.resource.data.sender != request.resource.data.recipient &&
+        id == request.resource.data.sender + '~' + request.resource.data.recipient &&
+        request.resource.data.participants == [request.resource.data.sender, request.resource.data.recipient] &&
+        request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        exists(/databases/$(database)/documents/profiles/$(request.resource.data.sender)) &&
+        exists(/databases/$(database)/documents/profiles/$(request.resource.data.recipient)) &&
+        !exists(/databases/$(database)/documents/connections/$(request.resource.data.recipient + '~' + request.resource.data.sender));
+      allow update: if verified() && request.auth.uid == resource.data.recipient && resource.data.status == 'pending' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+        request.resource.data.status in ['accepted', 'rejected'] && request.resource.data.updatedAt == request.time;
+      allow delete: if verified() && request.auth.uid in resource.data.participants;
+    }
+    match /shares/{uid} {
+      allow get: if own(uid) || (verified() && exists(/databases/$(database)/documents/shares/$(uid)) && request.time < resource.data.updatedAt + duration.value(24, 'h') && approved(request.auth.uid, uid));
+      allow list: if false;
+      allow create, update: if own(uid) &&
+        request.resource.data.keys().hasOnly(['altitude', 'measuredAt', 'updatedAt']) &&
+        request.resource.data.keys().hasAll(['altitude', 'measuredAt', 'updatedAt']) &&
+        request.resource.data.altitude is number && request.resource.data.altitude >= -12000 && request.resource.data.altitude <= 100000 &&
+        request.resource.data.measuredAt is timestamp && request.resource.data.measuredAt <= request.time &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if own(uid);
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
