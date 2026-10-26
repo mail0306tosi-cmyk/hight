@@ -7,3 +7,5 @@
 .sharing-notice,.sharing-server-state{font-size:12px;line-height:1.9;overflow-wrap:anywhere;padding:14px;border-radius:12px}.sharing-notice{background:#f3ecdc;color:#655130;border:1px solid #e6d7b8;margin:16px 0 4px}.sharing-server-state{background:#edf2e8;color:#173e35;font-weight:600;margin:14px 0}
 
 .quality-note{position:relative;font-size:12px;line-height:1.85;text-align:left;background:#fff9ea;color:#675431;padding:13px;border-radius:12px;margin:12px 0}.measurement progress{display:block;width:100%;height:8px;accent-color:#173e35;margin:14px 0}.measurement .cancel-measure{background:#fffdf7;color:#173e35;border:1px solid #b7c5af;margin-top:10px;padding:12px;min-height:48px;font-size:13px}
+
+.diagnostic summary{font-size:14px}.diagnostic-text{white-space:pre-wrap;overflow-wrap:anywhere}.diagnostic-scroll{max-width:100%;overflow-x:auto;margin:16px 0}.diagnostic table{border-collapse:collapse;font-size:11px;text-align:left;min-width:440px;width:100%}.diagnostic th,.diagnostic td{padding:8px;border-bottom:1px solid #dfe4d8;overflow-wrap:anywhere}.diagnostic caption{text-align:left;margin-bottom:8px}.diagnostic h3{margin-top:20px}

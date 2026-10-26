@@ -136,6 +136,53 @@ const baseURL = process.env.HIGHT_TEST_URL || 'http://127.0.0.1:8000';
       await tick(p,800);await p.evaluate(()=>sample(12));assert.match(await p.locator('#status').innerText(),/2\/8件/);
       await tick(p,20000);await failed(p,/3件以上/);
     });
+    await scenario('診断：生高度・中央値・水平/高度精度・端末情報・共有payload不変',{},async p=>{
+      await p.locator('#diagnostic summary').click();
+      await p.evaluate(()=>watches[0].ok({coords:{altitude:79.125,altitudeAccuracy:6.25,accuracy:12.5},timestamp:Date.now()}));
+      assert.match(await p.locator('#diagnostic-summary').innerText(),/最新の生高度：79.125 m/);
+      assert.match(await p.locator('#diagnostic-summary').innerText(),/暫定中央値（共有不可）：79.125 m/);
+      assert.match(await p.locator('#diagnostic-summary').innerText(),/高度精度：6.25 m／水平精度：12.5 m/);
+      assert.deepEqual(await p.evaluate(()=>events),[]);
+      await tick(p); await samples(p,[80,78,79,79,79,79,79]); await success(p,'79');
+      assert.match(await p.locator('#diagnostic-summary').innerText(),/採用標本の中央値：79 m/);
+      assert.match(await p.locator('#diagnostic-summary').innerText(),/受信8回・採用8回/);
+      assert.equal(await p.locator('#diagnostic-rows tr').count(),8);
+      assert.ok((await p.locator('#diagnostic-device').innerText()).includes(await p.evaluate(()=>navigator.userAgent)));
+    });
+    await scenario('診断：null/負精度は不明、精度0と区別',{},async p=>{
+      await p.evaluate(()=>watches[0].ok({coords:{altitude:null,altitudeAccuracy:null,accuracy:-1},timestamp:Date.now()}));
+      assert.match(await p.locator('#diagnostic-summary').textContent(),/高度なし1回/);
+      assert.match(await p.locator('#diagnostic-summary').textContent(),/最新の生高度：不明/);
+      assert.match(await p.locator('#diagnostic-summary').textContent(),/高度精度：不明／水平精度：不明/);
+      await tick(p);await p.evaluate(()=>watches[0].ok({coords:{altitude:0,altitudeAccuracy:0,accuracy:0},timestamp:Date.now()}));
+      assert.match(await p.locator('#diagnostic-summary').textContent(),/高度精度：0 m／水平精度：0 m/);
+    });
+    await scenario('診断：重複の除外理由・直近32件に制限・座標getter未読',{},async p=>{
+      await p.evaluate(()=>{const t=Date.now();for(let i=0;i<40;i++)watches[0].ok({coords:{altitude:27,altitudeAccuracy:4},timestamp:t});});
+      assert.equal(await p.locator('#diagnostic-rows tr').count(),32);
+      assert.match(await p.locator('#diagnostic-summary').textContent(),/受信40回・採用1回/);
+      assert.match(await p.locator('#diagnostic-rows').textContent(),/重複/);
+      await p.locator('#cancel-measure').click();
+      const before=await p.locator('#diagnostic-summary').textContent();
+      await p.evaluate(()=>sample(999));assert.equal(await p.locator('#diagnostic-summary').textContent(),before);
+      assert.match(before,/測定停止.*共有不可/);
+    });
+    await scenario('診断：失敗後の値は共有不可・再測定と再読み込みで消去',{},async p=>{
+      await p.evaluate(()=>sample(123.456789));await tick(p,20001);
+      assert.match(await p.locator('#diagnostic-summary').textContent(),/測定失敗.*共有不可/);
+      await p.locator('#measure').click();
+      assert.equal(await p.locator('#diagnostic-rows tr').count(),0);
+      assert.doesNotMatch(await p.locator('#diagnostic-summary').textContent(),/123.456789/);
+      await p.evaluate(()=>sample(123.456789));await p.reload();
+      assert.equal(await p.locator('#diagnostic-rows tr').count(),0);
+      assert.match(await p.locator('#diagnostic-summary').textContent(),/まだ測定していません/);
+      assert.equal(await p.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}).includes('123.456789')),false);
+    });
+    await scenario('診断：狭い320px画面でも表は画面内でスクロール',{},async p=>{
+      await p.setViewportSize({width:320,height:640});await p.locator('#diagnostic summary').click();
+      await samples(p,[100,101,102,103,104,105,106,107]);
+      assert.equal(await p.evaluate(()=>{const e=document.querySelector('.diagnostic-scroll');return e.scrollWidth>e.clientWidth;}),true);
+    });
     const blocked=await browser.newPage();await blocked.route('**/*',async route=>{const response=await route.fetch();await route.fulfill({response,headers:{...response.headers(),'permissions-policy':'geolocation=()'}});});
     await blocked.goto(baseURL);await blocked.locator('#measure').click();assert.equal(await blocked.locator('#status').innerText(),'測定失敗');assert.match(await blocked.locator('#error').innerText(),/Permissions Policy/);await blocked.close();count++;console.log('PASS 実ブラウザーのPermissions-Policy制限');
     const single=await browser.newPage();await single.route('**/app.js',r=>r.abort());await single.route('**/style.css',r=>r.abort());await single.goto(baseURL);assert.equal(await single.locator('#measure').isEnabled(),true);await single.close();count++;console.log('PASS 単一HTMLで初期化・外部JS/CSS不要');

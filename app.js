@@ -21,6 +21,26 @@ function median(values) {
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : sorted[mid - 1] / 2 + sorted[mid] / 2;
 }
+// 診断はこのページのメモリーだけ。位置座標・アカウント情報・共有イベントには含めない。
+const diagnosticSummary = document.querySelector("#diagnostic-summary");
+const diagnosticRows = document.querySelector("#diagnostic-rows");
+const deviceInfo = document.querySelector("#diagnostic-device");
+deviceInfo.textContent = `ブラウザー申告情報（機種・OSの厳密な判定ではありません）\n${navigator.userAgent}\nプラットフォーム：${navigator.userAgentData?.platform || navigator.platform || "不明"}\n言語：${navigator.language || "不明"}`;
+function diagnosticNumber(value) { return Number.isFinite(value) ? `${value} m` : "不明"; }
+function renderDiagnostic(run, state = "測定中") {
+  const values = run.samples.map(s => s.value);
+  const low = values.length ? Math.min(...values) : null, high = values.length ? Math.max(...values) : null;
+  const last = run.records[run.records.length - 1];
+  diagnosticSummary.textContent = `${state}／受信${run.received}回・採用${values.length}回・高度なし${run.missing}回\n最新の生高度：${last ? diagnosticNumber(last.value) : "未受信"}\n${run.done ? "採用標本の中央値" : "暫定中央値（共有不可）"}：${values.length ? diagnosticNumber(median(values)) : "不明"}\n採用標本の範囲：${values.length ? `${low}〜${high} m／幅 ${high - low} m` : "不明"}\n最新の高度精度：${last ? diagnosticNumber(last.vertical) : "不明"}／水平精度：${last ? diagnosticNumber(last.horizontal) : "不明"}`;
+  diagnosticRows.replaceChildren();
+  for (const record of run.records) {
+    const row = document.createElement("tr");
+    for (const value of [Number.isFinite(record.timestamp) && Math.abs(record.timestamp) <= 8640000000000000 ? new Date(record.timestamp).toLocaleTimeString("ja-JP") : "時刻不明", diagnosticNumber(record.value), diagnosticNumber(record.vertical), diagnosticNumber(record.horizontal), record.reason]) {
+      const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
+    }
+    diagnosticRows.append(row);
+  }
+}
 function active(run) { return current === run && !run.done; }
 function clearWatch(run) {
   if (run.watchId !== null) {
@@ -41,10 +61,11 @@ function fail(run, message) {
   finish(run); altitude.textContent = "—";
   statusText.textContent = "測定失敗";
   errorBox.textContent = message; errorBox.hidden = false;
+  renderDiagnostic(run, "測定失敗・中央値は参考のみ／共有不可");
 }
 function cancel(reason = "測定を停止しました。結果は確定していません。") {
   if (!current) return;
-  finish(current); altitude.textContent = "—";
+  const run = current; finish(run); renderDiagnostic(run, "測定停止・中央値は参考のみ／共有不可"); altitude.textContent = "—";
   statusText.textContent = reason;
 }
 function renderProgress(run) {
@@ -77,6 +98,7 @@ function complete(run) {
   finish(run);
   altitude.textContent = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
   statusText.textContent = "測定成功";
+  renderDiagnostic(run, "測定成功");
   accuracy.textContent = precision === null ? "端末の高度精度（95%指標）：不明"
     : `端末の高度精度（95%指標）：±${Math.ceil(precision)} m（標本中の最大報告値${unknown ? `・${unknown}件不明` : ""}）`;
   sampleRange.textContent = `今回の標本：${run.samples.length}件／範囲 ${low.toFixed(1)}〜${high.toFixed(1)} m／幅 ${(high - low).toFixed(1)} m。表示値は中央値です。`;
@@ -89,21 +111,32 @@ function complete(run) {
 function accept(run, position) {
   if (!active(run)) return;
   const now = Date.now(), timestamp = position?.timestamp;
-  if (!Number.isFinite(timestamp) || timestamp > now || timestamp < run.startedAt - 1000 || now - timestamp > 5000 || run.seen.has(timestamp)) return;
+  const coords = position?.coords;
+  const value = coords?.altitude, reported = coords?.altitudeAccuracy, horizontal = coords?.accuracy;
+  const record = { value: Number.isFinite(value) ? value : null, timestamp,
+    vertical: Number.isFinite(reported) && reported >= 0 ? reported : null,
+    horizontal: Number.isFinite(horizontal) && horizontal >= 0 ? horizontal : null, reason: "採用" };
+  run.received++;
   const last = run.samples[run.samples.length - 1];
-  if (last && timestamp - last.timestamp < MIN_INTERVAL) return;
-  const value = position?.coords?.altitude;
-  if (!Number.isFinite(value)) { run.missing++; return; }
-  const reported = position.coords.altitudeAccuracy;
-  run.seen.add(timestamp);
-  run.samples.push({ value, timestamp, precision: Number.isFinite(reported) && reported >= 0 ? reported : null });
+  if (!Number.isFinite(timestamp) || timestamp > now || timestamp < run.startedAt - 1000 || now - timestamp > 5000 || run.seen.has(timestamp)) record.reason = "除外：古い・重複・無効時刻";
+  else if (last && timestamp - last.timestamp < MIN_INTERVAL) record.reason = "除外：間隔不足";
+  else if (!Number.isFinite(value)) { run.missing++; record.reason = "除外：高度なし"; }
+  else {
+    run.seen.add(timestamp);
+    run.samples.push({ value, timestamp, precision: record.vertical });
+  }
+  run.records.push(record);
+  if (run.records.length > 32) run.records.shift();
+  renderDiagnostic(run);
+  if (record.reason !== "採用") return;
   renderProgress(run);
   if (run.samples.length >= TARGET) complete(run);
 }
 button.addEventListener("click", () => {
   if (current) return;
-  const run = { id: ++sequence, startedAt: Date.now(), samples: [], seen: new Set(), missing: 0, watchId: null, done: false };
+  const run = { id: ++sequence, startedAt: Date.now(), samples: [], records: [], received: 0, seen: new Set(), missing: 0, watchId: null, done: false };
   current = run;
+  renderDiagnostic(run);
   document.dispatchEvent(new Event("hight:measurement-reset"));
   altitude.textContent = "—";
   for (const element of [accuracy, sampleRange, warning, measuredAt, errorBox]) element.hidden = true;

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#173e35">
     <meta name="referrer" content="no-referrer">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-p7PWfahBoKA0tg4m+PaWEQ8jr9SJutm3+uT3tKq4te0='; style-src 'sha256-6mLrcyCT42iPZO/hYDQRZ9a6N29iMGgs41Jh5FQxNCg='; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-i1I17POGhVr18Nnm9+kTy+7Nw3qXxF5Nl23l83n2tdg='; style-src 'sha256-dlWY+q3WHh0txBEU9GsclY7ZVfAQVEOZmPOpuIz9mG8='; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>HIGHT | 今いる場所の標高</title>
     <!-- HIGHT:STYLE --><style>
 @charset "UTF-8";
@@ -17,6 +17,8 @@
 .sharing-notice,.sharing-server-state{font-size:12px;line-height:1.9;overflow-wrap:anywhere;padding:14px;border-radius:12px}.sharing-notice{background:#f3ecdc;color:#655130;border:1px solid #e6d7b8;margin:16px 0 4px}.sharing-server-state{background:#edf2e8;color:#173e35;font-weight:600;margin:14px 0}
 
 .quality-note{position:relative;font-size:12px;line-height:1.85;text-align:left;background:#fff9ea;color:#675431;padding:13px;border-radius:12px;margin:12px 0}.measurement progress{display:block;width:100%;height:8px;accent-color:#173e35;margin:14px 0}.measurement .cancel-measure{background:#fffdf7;color:#173e35;border:1px solid #b7c5af;margin-top:10px;padding:12px;min-height:48px;font-size:13px}
+
+.diagnostic summary{font-size:14px}.diagnostic-text{white-space:pre-wrap;overflow-wrap:anywhere}.diagnostic-scroll{max-width:100%;overflow-x:auto;margin:16px 0}.diagnostic table{border-collapse:collapse;font-size:11px;text-align:left;min-width:440px;width:100%}.diagnostic th,.diagnostic td{padding:8px;border-bottom:1px solid #dfe4d8;overflow-wrap:anywhere}.diagnostic caption{text-align:left;margin-bottom:8px}.diagnostic h3{margin-top:20px}
 
 </style><!-- /HIGHT:STYLE -->
   </head>
@@ -38,6 +40,15 @@
         <button id="cancel-measure" class="cancel-measure" type="button" hidden>測定を停止</button>
         <p class="hint">最大20秒・端末を動かさず測定。位置情報の許可が必要です</p>
       </section>
+      <details id="diagnostic" class="diagnostic social-card">
+        <summary>測定診断を開く（端末内のみ）</summary>
+        <p class="caption">自動補正・自動送信はしません。診断は今回の測定だけをメモリー内に保持し、再測定・再読み込みで消えます。緯度・経度は読み取り・記録しません。共有するのは従来どおり、共有ボタンを押したときの確定高度と時刻だけです。</p>
+        <p class="caption">生高度はブラウザーの返却値で、センサーの未加工値ではありません。表は直近32件の受信値です。中央値・ばらつきは採用標本のみで計算します。精度は端末の報告値で、端末間の同じ基準や正確さを保証しません。</p>
+        <p id="diagnostic-summary" class="caption diagnostic-text" role="status">まだ測定していません。</p>
+        <div class="diagnostic-scroll" tabindex="0" role="region" aria-label="受信標本（横にスクロールできます）"><table><caption>受信した生高度・精度と採用状況</caption><thead><tr><th>時刻</th><th>生高度</th><th>高度精度</th><th>水平精度</th><th>採用状況</th></tr></thead><tbody id="diagnostic-rows"></tbody></table></div>
+        <h3>OS・ブラウザー情報</h3><p id="diagnostic-device" class="caption diagnostic-text"></p>
+        <p class="caption">OSとブラウザーの正確なバージョン・機種名は端末設定でも確認してください。高度基準の違いは未確定です。別端末との一定の差も、中央値では補正されません。OSの位置情報サービス自体はネットワークを使用する場合があります。</p>
+      </details>
       <noscript><p class="error">測定失敗：JavaScriptが無効です。ブラウザーの設定でJavaScriptを有効にして、ページを再読み込みしてください。</p></noscript>
       <div id="error" class="error" role="alert" hidden></div>
       <section class="social" aria-labelledby="social-title">
@@ -120,6 +131,26 @@ function median(values) {
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : sorted[mid - 1] / 2 + sorted[mid] / 2;
 }
+// 診断はこのページのメモリーだけ。位置座標・アカウント情報・共有イベントには含めない。
+const diagnosticSummary = document.querySelector("#diagnostic-summary");
+const diagnosticRows = document.querySelector("#diagnostic-rows");
+const deviceInfo = document.querySelector("#diagnostic-device");
+deviceInfo.textContent = `ブラウザー申告情報（機種・OSの厳密な判定ではありません）\n${navigator.userAgent}\nプラットフォーム：${navigator.userAgentData?.platform || navigator.platform || "不明"}\n言語：${navigator.language || "不明"}`;
+function diagnosticNumber(value) { return Number.isFinite(value) ? `${value} m` : "不明"; }
+function renderDiagnostic(run, state = "測定中") {
+  const values = run.samples.map(s => s.value);
+  const low = values.length ? Math.min(...values) : null, high = values.length ? Math.max(...values) : null;
+  const last = run.records[run.records.length - 1];
+  diagnosticSummary.textContent = `${state}／受信${run.received}回・採用${values.length}回・高度なし${run.missing}回\n最新の生高度：${last ? diagnosticNumber(last.value) : "未受信"}\n${run.done ? "採用標本の中央値" : "暫定中央値（共有不可）"}：${values.length ? diagnosticNumber(median(values)) : "不明"}\n採用標本の範囲：${values.length ? `${low}〜${high} m／幅 ${high - low} m` : "不明"}\n最新の高度精度：${last ? diagnosticNumber(last.vertical) : "不明"}／水平精度：${last ? diagnosticNumber(last.horizontal) : "不明"}`;
+  diagnosticRows.replaceChildren();
+  for (const record of run.records) {
+    const row = document.createElement("tr");
+    for (const value of [Number.isFinite(record.timestamp) && Math.abs(record.timestamp) <= 8640000000000000 ? new Date(record.timestamp).toLocaleTimeString("ja-JP") : "時刻不明", diagnosticNumber(record.value), diagnosticNumber(record.vertical), diagnosticNumber(record.horizontal), record.reason]) {
+      const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
+    }
+    diagnosticRows.append(row);
+  }
+}
 function active(run) { return current === run && !run.done; }
 function clearWatch(run) {
   if (run.watchId !== null) {
@@ -140,10 +171,11 @@ function fail(run, message) {
   finish(run); altitude.textContent = "—";
   statusText.textContent = "測定失敗";
   errorBox.textContent = message; errorBox.hidden = false;
+  renderDiagnostic(run, "測定失敗・中央値は参考のみ／共有不可");
 }
 function cancel(reason = "測定を停止しました。結果は確定していません。") {
   if (!current) return;
-  finish(current); altitude.textContent = "—";
+  const run = current; finish(run); renderDiagnostic(run, "測定停止・中央値は参考のみ／共有不可"); altitude.textContent = "—";
   statusText.textContent = reason;
 }
 function renderProgress(run) {
@@ -176,6 +208,7 @@ function complete(run) {
   finish(run);
   altitude.textContent = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
   statusText.textContent = "測定成功";
+  renderDiagnostic(run, "測定成功");
   accuracy.textContent = precision === null ? "端末の高度精度（95%指標）：不明"
     : `端末の高度精度（95%指標）：±${Math.ceil(precision)} m（標本中の最大報告値${unknown ? `・${unknown}件不明` : ""}）`;
   sampleRange.textContent = `今回の標本：${run.samples.length}件／範囲 ${low.toFixed(1)}〜${high.toFixed(1)} m／幅 ${(high - low).toFixed(1)} m。表示値は中央値です。`;
@@ -188,21 +221,32 @@ function complete(run) {
 function accept(run, position) {
   if (!active(run)) return;
   const now = Date.now(), timestamp = position?.timestamp;
-  if (!Number.isFinite(timestamp) || timestamp > now || timestamp < run.startedAt - 1000 || now - timestamp > 5000 || run.seen.has(timestamp)) return;
+  const coords = position?.coords;
+  const value = coords?.altitude, reported = coords?.altitudeAccuracy, horizontal = coords?.accuracy;
+  const record = { value: Number.isFinite(value) ? value : null, timestamp,
+    vertical: Number.isFinite(reported) && reported >= 0 ? reported : null,
+    horizontal: Number.isFinite(horizontal) && horizontal >= 0 ? horizontal : null, reason: "採用" };
+  run.received++;
   const last = run.samples[run.samples.length - 1];
-  if (last && timestamp - last.timestamp < MIN_INTERVAL) return;
-  const value = position?.coords?.altitude;
-  if (!Number.isFinite(value)) { run.missing++; return; }
-  const reported = position.coords.altitudeAccuracy;
-  run.seen.add(timestamp);
-  run.samples.push({ value, timestamp, precision: Number.isFinite(reported) && reported >= 0 ? reported : null });
+  if (!Number.isFinite(timestamp) || timestamp > now || timestamp < run.startedAt - 1000 || now - timestamp > 5000 || run.seen.has(timestamp)) record.reason = "除外：古い・重複・無効時刻";
+  else if (last && timestamp - last.timestamp < MIN_INTERVAL) record.reason = "除外：間隔不足";
+  else if (!Number.isFinite(value)) { run.missing++; record.reason = "除外：高度なし"; }
+  else {
+    run.seen.add(timestamp);
+    run.samples.push({ value, timestamp, precision: record.vertical });
+  }
+  run.records.push(record);
+  if (run.records.length > 32) run.records.shift();
+  renderDiagnostic(run);
+  if (record.reason !== "採用") return;
   renderProgress(run);
   if (run.samples.length >= TARGET) complete(run);
 }
 button.addEventListener("click", () => {
   if (current) return;
-  const run = { id: ++sequence, startedAt: Date.now(), samples: [], seen: new Set(), missing: 0, watchId: null, done: false };
+  const run = { id: ++sequence, startedAt: Date.now(), samples: [], records: [], received: 0, seen: new Set(), missing: 0, watchId: null, done: false };
   current = run;
+  renderDiagnostic(run);
   document.dispatchEvent(new Event("hight:measurement-reset"));
   altitude.textContent = "—";
   for (const element of [accuracy, sampleRange, warning, measuredAt, errorBox]) element.hidden = true;

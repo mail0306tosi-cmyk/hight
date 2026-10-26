@@ -106,7 +106,7 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
     const bobDb = env.authenticatedContext(bob.uid, { email_verified: true }).firestore();
     await assertFails(getDoc(doc(bobDb, 'shares', alice.uid)));
     console.log('PASS 測定/トグルだけでは未送信・ボタンのみ標高送信・緯度経度なし・再測定では未更新');
-    await alice.page.locator('summary').click();
+    await alice.page.locator('summary').filter({ hasText: '招待コードで友達申請' }).click();
     await alice.page.locator('#friend-code').fill(bob.code);
     await alice.page.locator('#friend-form button').click();
     await bob.page.locator('#requests-list button').filter({ hasText: /^承認$/ }).waitFor();
@@ -171,7 +171,7 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
     assert.equal(await bob.page.locator('#friends-list li').count(), 0);
     console.log('PASS 友達解除・両画面の一覧更新・サーバーで閲覧拒否');
     // 再申請に対する拒否も実行。
-    await alice.page.locator('summary').click();
+    await alice.page.locator('summary').filter({ hasText: '招待コードで友達申請' }).click();
     await alice.page.locator('#friend-code').fill(bob.code);
     await alice.page.locator('#friend-form button').click();
     await bob.page.locator('#requests-list button').filter({ hasText: /^拒否$/ }).click();
