@@ -23,11 +23,24 @@ const esbuild = require('esbuild');
     await page.addInitScript(() => {
       window.measurements = 0; window.value = 100;
       Object.defineProperty(navigator, 'permissions', { value: { query: async () => ({ state: 'granted' }) } });
-      Object.defineProperty(navigator, 'geolocation', { value: { getCurrentPosition(ok, fail) {
-        window.measurements++;
-        if (window.value === null) fail({ code: 2 }); else ok({ coords: { altitude: window.value, latitude: 35, longitude: 139 }, timestamp: Date.now() });
-      } } });
+      let nextWatch = 0; const watches = new Map();
+      Object.defineProperty(navigator, 'geolocation', { value: {
+        watchPosition(ok, fail) {
+          window.measurements++; const id = nextWatch++; const timers = [];
+          watches.set(id, timers);
+          if (window.value === null) fail({ code: 2 });
+          else for (let i = 1; i <= 8; i++) timers.push(setTimeout(() => ok({ coords: { altitude: window.value, altitudeAccuracy: 4, latitude: 35, longitude: 139 }, timestamp: Date.now() }), i * 800));
+          return id;
+        },
+        clearWatch(id) { (watches.get(id) || []).forEach(clearTimeout); watches.delete(id); },
+      } });
     });
+    let virtualTime = false;
+    async function measure() {
+      await page.locator('#measure').click();
+      if (virtualTime) for (let i = 0; i < 8; i++) await page.clock.fastForward(800);
+      await page.locator('#status').filter({ hasText: /^(測定成功|測定失敗)$/ }).waitFor();
+    }
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.locator('#email').fill('alice@example.com'); await page.locator('#password').fill('Test-pass-123'); await page.locator('#register').click();
     await page.locator('#social-feedback').filter({ hasText: '確認メールを送信しました' }).waitFor();
@@ -41,16 +54,16 @@ const esbuild = require('esbuild');
     assert.equal(await page.locator('#sharing-toggle').isChecked(), false);
     assert.equal(await page.locator('#share-altitude').isDisabled(), true);
     await page.locator('#sharing-toggle').check(); assert.equal(await page.evaluate(() => measurements), 0);
-    await page.locator('#measure').click();
+    await measure();
     assert.equal(await page.evaluate(() => uiFixture.calls.filter(x => x[0] === 'share').length), 0);
     await page.locator('#share-altitude').click();
     await page.locator('#social-feedback').filter({ hasText: '標高を共有しました' }).waitFor();
     assert.match(await page.locator('#share-hint').innerText(), /共有中.*画面やアプリを閉じても.*新しい標高は自動送信されません/);
     const shared = await page.evaluate(() => uiFixture.calls.find(x => x[0] === 'share')[1]);
     assert.deepEqual(Object.keys(shared).sort(), ['altitude','timestamp']); assert.equal(shared.altitude, 100);
-    await page.evaluate(() => { window.value = 200; }); await page.locator('#measure').click();
+    await page.evaluate(() => { window.value = 200; }); await measure();
     assert.equal(await page.evaluate(() => uiFixture.calls.filter(x => x[0] === 'share').length), 1);
-    await page.evaluate(() => { window.value = null; }); await page.locator('#measure').click();
+    await page.evaluate(() => { window.value = null; }); await measure();
     assert.equal(await page.locator('#share-altitude').isDisabled(), true);
     console.log('PASS UI: 初期非公開/オンと測定は未送信/共有ボタンのみ値を渡す/緯度経度なし/測定失敗時無効');
     await page.evaluate(() => uiFixture.incoming());
@@ -62,9 +75,9 @@ const esbuild = require('esbuild');
     await page.evaluate(() => uiFixture.late());
     assert.equal(await page.locator('#friends-list li').count(), 0, '解除後の遅延通知でも表示を復活させない');
     console.log('PASS UI: 受信申請の承認/友達の標高と時刻/解除で一覧消去・購読解除/遅延通知の無視');
-    await page.clock.install();
+    await page.clock.install(); virtualTime = true;
     await page.evaluate(() => { window.value = 300; uiFixture.sharePending = true; });
-    await page.locator('#measure').click();
+    await measure();
     await page.locator('#share-altitude').click();
     await page.clock.fastForward(12001);
     await page.locator('#social-feedback').filter({ hasText: '後から反映' }).waitFor();
@@ -74,7 +87,7 @@ const esbuild = require('esbuild');
     await page.evaluate(() => { uiFixture.sharePending = false; });
     await page.locator('#refresh-verification').click();
     await page.locator('#social-feedback').filter({ hasText: 'メール確認済みです' }).waitFor();
-    await page.locator('#measure').click();
+    await measure();
     await page.locator('#sharing-toggle').check();
     assert.equal(await page.locator('#share-altitude').isDisabled(), true, '確認状態の再取得でも未完了共有のロックを解除しない');
     assert.equal(await page.locator('#stop-warning').isVisible(), true);

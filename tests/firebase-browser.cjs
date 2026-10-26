@@ -34,9 +34,15 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
     const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
     await context.addInitScript(() => {
       Object.defineProperty(navigator, 'permissions', { value: { query: async () => ({ state: 'granted' }) } });
-      Object.defineProperty(navigator, 'geolocation', { value: { getCurrentPosition(ok) {
-        ok({ coords: { altitude: window.testAltitude ?? 123, altitudeAccuracy: 3, latitude: 35, longitude: 139 }, timestamp: Date.now() });
-      } } });
+      let nextWatch = 0; const watches = new Map();
+      Object.defineProperty(navigator, 'geolocation', { value: {
+        watchPosition(ok) {
+          const id = nextWatch++, timers = []; watches.set(id, timers);
+          for (let i = 1; i <= 8; i++) timers.push(setTimeout(() => ok({ coords: { altitude: window.testAltitude ?? 123, altitudeAccuracy: 3, latitude: 35, longitude: 139 }, timestamp: Date.now() }), i * 800));
+          return id;
+        },
+        clearWatch(id) { (watches.get(id) || []).forEach(clearTimeout); watches.delete(id); },
+      } });
     });
     const page = await context.newPage();
     page.on('pageerror', e => errors.push(e.message));
@@ -80,6 +86,8 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
       return data;
     }
     await alice.page.locator('#measure').click();
+    assert.equal(await alice.page.locator('#share-altitude').isDisabled(), true);
+    await alice.page.locator('#status').filter({ hasText: '測定成功' }).waitFor();
     assert.equal(await shareExists(), null);
     await alice.page.locator('#sharing-toggle').check();
     assert.equal(await shareExists(), null);
@@ -92,6 +100,8 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
     assert.equal(share.altitude, 123);
     await alice.page.evaluate(() => { window.testAltitude = 222; });
     await alice.page.locator('#measure').click();
+    assert.equal(await alice.page.locator('#share-altitude').isDisabled(), true);
+    await alice.page.locator('#status').filter({ hasText: '測定成功' }).waitFor();
     assert.equal((await shareExists()).altitude, 123);
     const bobDb = env.authenticatedContext(bob.uid, { email_verified: true }).firestore();
     await assertFails(getDoc(doc(bobDb, 'shares', alice.uid)));
@@ -110,6 +120,7 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
     console.log('PASS 申請・受信側承認・承認済み友達の標高/時刻表示・友達に招待コードを公開しない');
     // 両者が共有し、双方に実在する値を見せた上で解除をテストする。
     await bob.page.locator('#measure').click();
+    await bob.page.locator('#status').filter({ hasText: '測定成功' }).waitFor();
     await bob.page.locator('#sharing-toggle').check();
     await bob.page.locator('#share-altitude').click();
     await bob.page.locator('#social-feedback').filter({ hasText: '標高を共有しました' }).waitFor();
@@ -134,6 +145,8 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
     assert.equal((await shareExists()).updatedAt.toMillis(), beforeClose.updatedAt.toMillis());
     await alice.page.evaluate(() => { window.testAltitude = 222; });
     await alice.page.locator('#measure').click();
+    assert.equal(await alice.page.locator('#share-altitude').isDisabled(), true);
+    await alice.page.locator('#status').filter({ hasText: '測定成功' }).waitFor();
     console.log('PASS 実際に画面を閉じても最後の標高を友達が取得可能・再ログイン後の共有中表示と注意文・自動更新なし');
     await alice.page.locator('#stop-sharing').click();
     await alice.page.locator('#social-feedback').filter({ hasText: '共有を停止しました' }).waitFor();

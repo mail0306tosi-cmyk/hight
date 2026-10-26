@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#173e35">
     <meta name="referrer" content="no-referrer">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-c/q246fUZKXEw92zwYb0UekJgB9Dk+FqQjQTSKKo50U='; style-src 'sha256-EiZMPN8pEQo9smWwxz1ig7qTBvwEg7C1HjYPVQocavs='; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-p7PWfahBoKA0tg4m+PaWEQ8jr9SJutm3+uT3tKq4te0='; style-src 'sha256-6mLrcyCT42iPZO/hYDQRZ9a6N29iMGgs41Jh5FQxNCg='; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>HIGHT | 今いる場所の標高</title>
     <!-- HIGHT:STYLE --><style>
 @charset "UTF-8";
@@ -16,21 +16,27 @@
 
 .sharing-notice,.sharing-server-state{font-size:12px;line-height:1.9;overflow-wrap:anywhere;padding:14px;border-radius:12px}.sharing-notice{background:#f3ecdc;color:#655130;border:1px solid #e6d7b8;margin:16px 0 4px}.sharing-server-state{background:#edf2e8;color:#173e35;font-weight:600;margin:14px 0}
 
+.quality-note{position:relative;font-size:12px;line-height:1.85;text-align:left;background:#fff9ea;color:#675431;padding:13px;border-radius:12px;margin:12px 0}.measurement progress{display:block;width:100%;height:8px;accent-color:#173e35;margin:14px 0}.measurement .cancel-measure{background:#fffdf7;color:#173e35;border:1px solid #b7c5af;margin-top:10px;padding:12px;min-height:48px;font-size:13px}
+
 </style><!-- /HIGHT:STYLE -->
   </head>
   <body>
     <main class="app">
       <header><a class="brand" href="./" aria-label="HIGHT ホーム">HIGHT<span class="brand-dot">.</span></a><span class="tag">今いる場所を、知ろう。</span></header>
-      <section class="intro"><p class="eyebrow">A LITTLE CLOSER TO THE SKY</p><h1>ここは、海から<br>どのくらい高い？</h1><p>あなたのいる場所の標高を測ってみましょう。</p></section>
+      <section class="intro"><p class="eyebrow">A LITTLE CLOSER TO THE SKY</p><h1>この場所の高さを、<br>もう少していねいに。</h1><p>端末が推定する高さを、複数回測って比べましょう。</p></section>
       <section class="measurement" aria-labelledby="measurement-title">
         <div class="mountains" aria-hidden="true"><span></span><span></span><span></span></div>
-        <h2 id="measurement-title">現在地の標高</h2>
+        <h2 id="measurement-title">端末位置の高さ（参考値）</h2>
         <div class="reading" role="status" aria-live="polite" aria-atomic="true"><span id="altitude">—</span><span class="unit">m</span></div>
         <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">測定失敗：JavaScriptを準備中です。表示が変わらない場合は、再読み込みして通常のブラウザーで開いてください。</p>
         <p id="accuracy" class="detail" hidden></p>
+        <p id="sample-range" class="detail" hidden></p>
+        <p id="measurement-warning" class="quality-note" role="status" hidden></p>
+        <progress id="measurement-progress" max="8" value="0" aria-label="採用標本の進捗" hidden></progress>
         <p id="measured-at" class="detail" hidden></p>
-        <button id="measure" type="button" disabled><span aria-hidden="true">◎</span> <span id="button-label">標高を測定</span></button>
-        <p class="hint">測定には位置情報の許可が必要です</p>
+        <button id="measure" type="button" disabled><span aria-hidden="true">◎</span> <span id="button-label">高さを測定</span></button>
+        <button id="cancel-measure" class="cancel-measure" type="button" hidden>測定を停止</button>
+        <p class="hint">最大20秒・端末を動かさず測定。位置情報の許可が必要です</p>
       </section>
       <noscript><p class="error">測定失敗：JavaScriptが無効です。ブラウザーの設定でJavaScriptを有効にして、ページを再読み込みしてください。</p></noscript>
       <div id="error" class="error" role="alert" hidden></div>
@@ -63,6 +69,7 @@
           </section>
           <section class="social-card" aria-labelledby="sharing-title">
             <h3 id="sharing-title">標高の共有</h3>
+            <p class="caption">ここで共有する「標高」は端末位置の参考高度です。地面の標高や床からの高さではありません。</p>
             <label class="toggle-row" for="sharing-toggle"><span>次の標高の送信準備 <strong id="sharing-state">準備なし（共有停止ではありません）</strong></span><input id="sharing-toggle" type="checkbox" role="switch"></label>
             <p class="caption">初めての利用時は非公開です。このスイッチは次の送信の準備です。オンにするだけでは送信しません。すでに共有中の値は、下の共有状態で確認してください。</p>
             <p id="sharing-persistence-notice" class="sharing-notice">画面やアプリを閉じても、最後に共有した標高は承認済みの友達に表示され続けます。止めるには「共有停止」を押してください。新しい標高は自動送信されません。</p>
@@ -77,6 +84,7 @@
             <details><summary>招待コードで友達申請</summary><form id="friend-form"><label for="friend-code">相手の招待コード</label><input id="friend-code" minlength="32" maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false" required><button class="secondary" type="submit">友達申請を送る</button></form></details>
             <p class="caption">申請中は標高を表示しません。受け取った側だけが承認・拒否できます。</p>
             <button id="refresh-friends" class="secondary" type="button">友達の標高を更新</button>
+            <p class="caption">友達には精度やばらつきは送られません。共有された数値だけで、どちらのスマホが上にあるかは確定できません。</p>
             <p class="caption">共有中の値はサーバーから更新します。共有再開後に表示されない場合は更新ボタンを押してください。</p>
             <ul id="requests-list" class="friends-list" aria-label="友達申請"></ul>
             <ul id="friends-list" class="friends-list" aria-label="承認済みの友達"></ul>
@@ -85,7 +93,7 @@
         </div>
       </section>
       <aside class="privacy"><span aria-hidden="true">◇</span><div><h2>緯度・経度は、あなたの端末だけに。</h2><p>このアプリは緯度・経度を送信・保存しません。標高はメール確認後に「標高を共有」を押した場合だけFirebaseに保存し、承認済みの友達に公開します。</p></div></aside>
-      <p class="note">標高は端末が取得した海抜高度の目安です。端末や周囲の環境によって取得できない場合や誤差があります。安全に関わる判断には使用しないでください。</p>
+      <p class="note">W3C仕様上の高度はWGS84楕円体基準です。表示はOS・ブラウザーが推定した端末位置の参考値です。海抜、地面の標高、床からスマホまでの高さではありません。取得方式はGPSに限りません。高度精度は端末が報告するメートル単位の95%指標で、中央値の信頼区間ではありません。安全に関わる判断には使用しないでください。</p>
       <footer>HIGHT <span>足もとから、新しい発見。</span></footer>
     </main>
     <!-- HIGHT:SCRIPT --><script>
@@ -93,114 +101,147 @@
 
 const button = document.querySelector("#measure");
 const buttonLabel = document.querySelector("#button-label");
+const cancelButton = document.querySelector("#cancel-measure");
 const altitude = document.querySelector("#altitude");
 const statusText = document.querySelector("#status");
 const accuracy = document.querySelector("#accuracy");
+const sampleRange = document.querySelector("#sample-range");
+const warning = document.querySelector("#measurement-warning");
+const progress = document.querySelector("#measurement-progress");
 const measuredAt = document.querySelector("#measured-at");
 const errorBox = document.querySelector("#error");
-let measuring = false;
-let requestId = 0;
-let watchdog;
+const TARGET = 8, MINIMUM = 3, DURATION = 20000, MIN_INTERVAL = 750;
+const permissionHelp = "ブラウザーと端末の設定で位置情報を許可してください。埋め込みプレビューで制限される場合はHTTPSの独立したタブで開いてください。";
+let current = null;
+let sequence = 0;
 
-const permissionHelp = "ブラウザーのサイト設定と端末の設定で位置情報を許可し、再測定してください。埋め込みプレビューでは位置情報が制限される場合があります。その場合はページをHTTPSの独立したタブで開いてください。";
-
-function finish() {
-  clearTimeout(watchdog);
-  measuring = false;
-  button.disabled = false;
-  button.removeAttribute("aria-busy");
-  buttonLabel.textContent = "標高を測定";
+function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : sorted[mid - 1] / 2 + sorted[mid] / 2;
 }
-
-function showError(message) {
-  finish();
+function active(run) { return current === run && !run.done; }
+function clearWatch(run) {
+  if (run.watchId !== null) {
+    try { navigator.geolocation.clearWatch(run.watchId); } catch { /* 監視終了を試み、遅延応答もactiveで無視する。 */ }
+    run.watchId = null;
+  }
+}
+function finish(run) {
+  run.done = true;
+  clearTimeout(run.deadline); clearInterval(run.ticker); clearWatch(run);
+  if (current === run) current = null;
+  button.disabled = false; button.removeAttribute("aria-busy");
+  buttonLabel.textContent = "高さを再測定";
+  cancelButton.hidden = true; progress.hidden = true;
+}
+function fail(run, message) {
+  if (!active(run)) return;
+  finish(run); altitude.textContent = "—";
   statusText.textContent = "測定失敗";
-  errorBox.textContent = message;
-  errorBox.hidden = false;
+  errorBox.textContent = message; errorBox.hidden = false;
 }
-
+function cancel(reason = "測定を停止しました。結果は確定していません。") {
+  if (!current) return;
+  finish(current); altitude.textContent = "—";
+  statusText.textContent = reason;
+}
+function renderProgress(run) {
+  if (!active(run)) return;
+  const seconds = Math.max(0, Math.ceil((run.startedAt + DURATION - Date.now()) / 1000));
+  progress.value = run.samples.length;
+  statusText.textContent = `測定中：${run.samples.length}/${TARGET}件・残り最大${seconds}秒。同じ場所で端末を動かさずお待ちください。`;
+}
+function complete(run) {
+  if (!active(run)) return;
+  if (run.samples.length < MINIMUM) {
+    const detail = run.missing ? "端末から高度が返されませんでした、または有効な高度が不足しています。" : "新鮮で異なる時刻の標本が不足しています。";
+    fail(run, `20秒以内に${MINIMUM}件以上の標本を取得できませんでした。${detail}屋外の空が見える場所で再測定してください。端末によっては高度を取得できません。${permissionHelp}`);
+    return;
+  }
+  const values = run.samples.map(s => s.value);
+  const value = median(values), low = Math.min(...values), high = Math.max(...values);
+  const known = run.samples.map(s => s.precision).filter(Number.isFinite);
+  const unknown = run.samples.length - known.length;
+  const precision = known.length ? Math.max(...known) : null;
+  const notes = [];
+  if (unknown) notes.push(`${unknown}/${run.samples.length}件は端末の高度精度が不明です。`);
+  // 10m/5mはこのUIの注意喚起用の目安であり、測量・階数判定の基準ではない。
+  if (precision !== null && precision > 10) notes.push("端末精度が低めです（10m超は注意の目安）。小さな高さ差の比較には不向きです。");
+  if (high - low > 5) notes.push("標本のばらつきが大きめです（範囲5m超は注意の目安）。中央値でも誤差を除去できる保証はありません。");
+  if (run.samples.length < TARGET) notes.push(`標本は${run.samples.length}/${TARGET}件で終了した参考値です。再測定もお試しください。`);
+  notes.push(high - low <= 3 ? "この測定中のばらつきは小さめですが、安定＝正確ではありません。" : "端末間の差が実際の高さ差とは限りません。");
+  notes.push("端末ごとの系統誤差は繰り返しても消えません。端末精度は中央値の95%信頼区間ではありません。");
+  const timestamp = run.samples[run.samples.length - 1].timestamp;
+  finish(run);
+  altitude.textContent = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
+  statusText.textContent = "測定成功";
+  accuracy.textContent = precision === null ? "端末の高度精度（95%指標）：不明"
+    : `端末の高度精度（95%指標）：±${Math.ceil(precision)} m（標本中の最大報告値${unknown ? `・${unknown}件不明` : ""}）`;
+  sampleRange.textContent = `今回の標本：${run.samples.length}件／範囲 ${low.toFixed(1)}〜${high.toFixed(1)} m／幅 ${(high - low).toFixed(1)} m。表示値は中央値です。`;
+  warning.textContent = notes.join(" ");
+  measuredAt.textContent = `最後の採用標本：${new Date(timestamp).toLocaleTimeString("ja-JP")}`;
+  for (const element of [accuracy, sampleRange, warning, measuredAt]) element.hidden = false;
+  // 共有との契約を維持。精度・標本・緯度経度は渡さず、完了した代表値と時刻だけ。
+  document.dispatchEvent(new CustomEvent("hight:measurement", { detail: { altitude: value, timestamp } }));
+}
+function accept(run, position) {
+  if (!active(run)) return;
+  const now = Date.now(), timestamp = position?.timestamp;
+  if (!Number.isFinite(timestamp) || timestamp > now || timestamp < run.startedAt - 1000 || now - timestamp > 5000 || run.seen.has(timestamp)) return;
+  const last = run.samples[run.samples.length - 1];
+  if (last && timestamp - last.timestamp < MIN_INTERVAL) return;
+  const value = position?.coords?.altitude;
+  if (!Number.isFinite(value)) { run.missing++; return; }
+  const reported = position.coords.altitudeAccuracy;
+  run.seen.add(timestamp);
+  run.samples.push({ value, timestamp, precision: Number.isFinite(reported) && reported >= 0 ? reported : null });
+  renderProgress(run);
+  if (run.samples.length >= TARGET) complete(run);
+}
 button.addEventListener("click", () => {
-  if (measuring) return;
-  const currentRequest = ++requestId;
-  const active = () => measuring && currentRequest === requestId;
+  if (current) return;
+  const run = { id: ++sequence, startedAt: Date.now(), samples: [], seen: new Set(), missing: 0, watchId: null, done: false };
+  current = run;
   document.dispatchEvent(new Event("hight:measurement-reset"));
   altitude.textContent = "—";
-  accuracy.hidden = true;
-  measuredAt.hidden = true;
-  errorBox.hidden = true;
-  measuring = true;
-  button.disabled = true;
-  button.setAttribute("aria-busy", "true");
-  buttonLabel.textContent = "測定中…";
-  statusText.textContent = "測定中：位置情報の許可を確認し、現在地を取得しています…";
-
-  // APIのタイムアウトは許可待ちを含まない場合があるため、画面側でも監視する。
-  watchdog = setTimeout(() => {
-    if (active()) showError("25秒以内に位置情報の応答がありませんでした。許可の確認画面が出ていないか確認してください。" + permissionHelp);
-  }, 25000);
-
+  for (const element of [accuracy, sampleRange, warning, measuredAt, errorBox]) element.hidden = true;
+  button.disabled = true; button.setAttribute("aria-busy", "true"); buttonLabel.textContent = "測定中…";
+  cancelButton.hidden = false; progress.hidden = false; progress.value = 0;
+  renderProgress(run);
+  run.deadline = setTimeout(() => complete(run), DURATION);
+  run.ticker = setInterval(() => renderProgress(run), 250);
   try {
-    if (!window.isSecureContext) {
-      showError("位置情報を使うには、安全な接続（HTTPS）が必要です。HTTPSでページを開いてください。HTTPのプレビューでは測定できません。");
-      return;
-    }
-    if (!navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== "function") {
-      showError("この環境では位置情報APIを利用できません。スマートフォンのSafariやChromeなど、対応ブラウザーでHTTPSのページを開いてください。");
-      return;
+    if (!window.isSecureContext) { fail(run, "位置情報にはHTTPSが必要です。HTTPSのページで開いてください。"); return; }
+    if (!navigator.geolocation || typeof navigator.geolocation.watchPosition !== "function" || typeof navigator.geolocation.clearWatch !== "function") {
+      fail(run, "この環境では位置情報APIを利用できません。対応ブラウザーでHTTPSのページを開いてください。"); return;
     }
     const policy = document.permissionsPolicy || document.featurePolicy;
-    if (policy && typeof policy.allowsFeature === "function" && !policy.allowsFeature("geolocation")) {
-      showError("プレビューまたは配信元のPermissions Policyにより、位置情報の利用が禁止されています。HTTPSの独立したタブで開いてください。改善しない場合は、配信側のPermissions-Policyヘッダーと埋め込みiframeのallow属性でgeolocationの許可を確認してください。");
-      return;
+    if (policy?.allowsFeature && !policy.allowsFeature("geolocation")) {
+      fail(run, "プレビューまたは配信元のPermissions Policyで位置情報が禁止されています。HTTPSの独立したタブで開くか、iframeのallow属性と配信側の設定を確認してください。"); return;
     }
-    // Permissions APIが非対応・応答待ちでも測位自体は止めない。
-    if (navigator.permissions && typeof navigator.permissions.query === "function") {
-      try {
-        navigator.permissions.query({ name: "geolocation" }).then((permission) => {
-          if (active() && permission.state === "denied") {
-            showError("位置情報の権限が拒否されています。" + permissionHelp);
-          }
-        }).catch(() => {});
-      } catch { /* 権限の最終判断はGeolocation APIの結果に従う。 */ }
+    if (navigator.permissions?.query) {
+      try { navigator.permissions.query({ name: "geolocation" }).then(p => {
+        if (active(run) && p.state === "denied") fail(run, "位置情報の権限が拒否されています。" + permissionHelp);
+      }).catch(() => {}); } catch { /* 非対応時も測位は試す。 */ }
     }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (!active()) return;
-        const value = position.coords.altitude;
-        if (!Number.isFinite(value)) {
-          showError("現在地は取得できましたが、端末から標高が返されませんでした。屋外の空が見える場所で、位置情報を有効にしたスマートフォンから再測定してください。パソコンや一部の端末・プレビューでは標高を取得できません。");
-          return;
-        }
-        altitude.textContent = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
-        statusText.textContent = "測定成功";
-        document.dispatchEvent(new CustomEvent("hight:measurement", { detail: { altitude: value, timestamp: position.timestamp } }));
-        const uncertainty = position.coords.altitudeAccuracy;
-        accuracy.textContent = Number.isFinite(uncertainty) && uncertainty >= 0
-          ? `高度の精度：±${Math.ceil(uncertainty).toLocaleString("ja-JP")} m（端末の報告値）`
-          : "高度の精度：端末からの情報なし";
-        accuracy.hidden = false;
-        measuredAt.textContent = `測定時刻：${new Date(position.timestamp).toLocaleTimeString("ja-JP")}`;
-        measuredAt.hidden = false;
-        finish();
-      },
-      (error) => {
-        if (!active()) return;
-        const messages = {
-          1: "位置情報の使用が許可されていません。" + permissionHelp,
-          2: "現在地を取得できませんでした。端末の位置情報が有効か確認し、屋外の空が見える場所でもう一度お試しください。プレビューの場合は通常のブラウザーでHTTPSのページを開いてください。",
-          3: "位置情報の取得がタイムアウトしました。端末の位置情報と許可を確認し、場所を変えて再測定してください。",
-        };
-        showError(messages[error.code] || "位置情報の取得中にエラーが発生しました。ページを再読み込みして再測定してください。" + permissionHelp);
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
-    );
-  } catch {
-    showError("位置情報を利用できませんでした。" + permissionHelp);
-  }
+    const watchId = navigator.geolocation.watchPosition(position => accept(run, position), error => {
+      if (!active(run)) return;
+      if (error.code === 3) return; // watchの一時タイムアウトは全体20秒の期限まで待つ。
+      const message = error.code === 1 ? "位置情報の使用が許可されていません。"
+        : error.code === 2 ? "現在地を取得できません。端末の位置情報設定と測定場所を確認してください。"
+        : "位置情報の取得中にエラーが発生しました。再測定してください。";
+      fail(run, message + permissionHelp);
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    run.watchId = watchId;
+    // 同期的に失敗通知する実装/モックでも、後から返った監視IDを確実に解放する。
+    if (!active(run)) clearWatch(run);
+  } catch { fail(run, "位置情報を利用できませんでした。" + permissionHelp); }
 });
-
-// 読み込み・イベント登録が完了してからボタンを有効にする。
-statusText.textContent = "測定待機中：「標高を測定」を押してください";
+cancelButton.addEventListener("click", () => cancel());
+window.addEventListener("pagehide", () => cancel("画面を閉じたため測定を停止しました。"));
+document.addEventListener("visibilitychange", () => { if (document.hidden) cancel("画面が非表示になったため測定を停止しました。再測定してください。"); });
+statusText.textContent = "測定待機中：「高さを測定」を押してください";
 button.disabled = false;
 
 ;

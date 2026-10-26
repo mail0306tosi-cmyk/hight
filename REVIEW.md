@@ -599,3 +599,12 @@ DEVICE_TEST_PLAN.mdとRELEASE_AUDIT.mdの最新欄も更新しました。以降
 完全差分とmanifestは最終ローカルコミット後に/workspace/hight-reviewへ保存します。本番ルール再適用/設定変更/本番書込、GitHub反映、Pages公開、課金変更はすべて未実行です。
 
 本日の追加コネクタ観測でもActions最新runは40191060730、dynamic/pages/pages-build-deployment、main/285c544でsuccess、mainの.github/workflowsはGET404です。ブランチ反映でPages自動公開が起動する可能性を前提に、push/merge自体を公開承認に含めます。コード反映してから公開だけ止める手順は採りません。DEVICE_TEST_PLAN.md全文を簡潔な16段階の現行試験表に整理しました。今回のローカルGit読取と公開GitHubへのHEADはどちらもCONNECT 403（server: envoy）で、GitHub TLS前のプロキシ経路拒否と区別します。
+
+
+## 2026年10月26日：端末位置の高さ測定の改修（ローカル・未公開）
+
+公開版335c2baと同一treeの68fc283からfeature/height-measurement-qualityで改修。元公開候補のブランチとコミットは保持しています。実装/原因分析/37シナリオと既存回帰の根拠、実機手順はHEIGHT_MEASUREMENT_REVIEW.mdへ保存しました。
+
+既存にもaltitudeAccuracy表示はあり、今回は単発getCurrentPositionから有限時間watchPosition・中央値・標本範囲・不明/低精度警告へ強化したものです。79m/47mの原因はログなしで断定しません。WGS84楕円体高度の参考値とし海抜断定を修正。安定＝正確とはせず、端末精度を中央値の95%信頼区間と合成しません。友達に精度メタデータは届かず、既存共有値だけで上下は確定できないと明示しました。
+
+完了時イベントはaltitude/timestampだけを維持。精度/標本/緯度経度はFirebaseへ送らず、履歴保存なし。cancel/pagehide/背景移行で監視を解除し、途中/失敗/停止後の旧値を新たな共有候補にしません。測定37、ルール21、統合13、UI7、Auth6はすべて終了0。今回本番ルール/Firebase/課金/本番データ/GitHub/Pagesを変更していません。
