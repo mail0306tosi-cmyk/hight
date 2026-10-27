@@ -48,7 +48,7 @@ const esbuild = require('esbuild');
     for (const id of ids) { const b = await page.locator('#'+id).boundingBox(); assert.ok(b.y>=0 && b.y+b.height<=navBox.y, `${id} fits initial viewport`); }
   };
   await assertCoreFits(['altitude','measure','share-altitude','stop-sharing']);
-  await page.clock.install();await page.locator('#measure').click();
+  await page.clock.install({time:new Date('2026-10-27T12:00:00Z')});await page.clock.pauseAt(new Date('2026-10-27T12:00:01Z'));await page.locator('#measure').click();
   await assertCoreFits(['altitude','measure','cancel-measure','share-altitude','stop-sharing']);
   for(let i=0;i<8;i++){
    await page.clock.fastForward(1000);
@@ -57,10 +57,20 @@ const esbuild = require('esbuild');
   }
   assert.equal(await page.locator('#altitude').innerText(),'128');assert.equal(await page.evaluate(()=>cleared),1);
   assert.equal(await page.evaluate(()=>uiFixture.calls.filter(c=>c[0]==='share').length),0);
-  await page.locator('#sharing-toggle').check();await page.locator('#share-altitude').click();
+  await page.locator('#share-altitude').click();
   await page.locator('#sharing-summary').filter({hasText:'共有中：128 m'}).waitFor();
   assert.deepEqual(await page.evaluate(()=>Object.keys(uiFixture.calls.find(c=>c[0]==='share')[1]).sort()),['altitude','timestamp']);
   console.log('PASS redesign: 画面移動中の測定/診断維持・手動共有のみ・精度/座標を共有しない');
+  assert.equal(await page.locator('#social-feedback').getAttribute('data-kind'),'success');
+  await page.clock.fastForward(4999);assert.match(await page.locator('#social-feedback').innerText(),/標高を共有しました/);
+  await page.clock.fastForward(1);assert.equal(await page.locator('#social-feedback').textContent(),'');
+  assert.match(await page.locator('#sharing-summary').innerText(),/共有中/);
+  await page.locator('#share-altitude').click();await page.locator('#social-feedback').filter({hasText:'標高を共有しました'}).waitFor();
+  await page.clock.fastForward(3000);await nav('friends');await page.locator('#refresh-friends').click();
+  await page.locator('#social-feedback').filter({hasText:'友達の表示を更新しました'}).waitFor();
+  await page.clock.fastForward(2000);assert.match(await page.locator('#social-feedback').innerText(),/友達の表示を更新しました/);
+  await page.clock.fastForward(3000);assert.equal(await page.locator('#social-feedback').textContent(),'');
+  console.log('PASS polish: 成功通知は5秒で消える・共有カードは残る・新しい通知を古いタイマーが消さない');
   await page.evaluate(()=>uiFixture.seedFriends());await nav('friends');
   await page.locator('#friends-list strong').filter({hasText:'あおい'}).waitFor();
   assert.deepEqual(await order(),['east','north','quietA','quietB']);
@@ -68,6 +78,16 @@ const esbuild = require('esbuild');
   assert.match(await page.locator('[data-uid="quietA"]').innerText(),/非公開/);
   assert.doesNotMatch(await page.locator('#friends-list').innerText(),/高度精度/);
   console.log('PASS redesign: 更新日時降順・非公開は下に日本語名順・精度なしは表示しない');
+  for(const [age,label] of [[0,'たった今'],[60000,'1分前'],[3599999,'59分前'],[3600000,'1時間前'],[86400000,'1日前'],[604799999,'6日前']]){
+    await page.evaluate(age=>{const t=Date.now()-age;uiFixture.emitFriend('north',{altitude:412,updatedAt:{toDate:()=>new Date(t)}});},age);
+    assert.match(await page.locator('[data-uid="north"]>.caption').innerText(),new RegExp(label));
+  }
+  await page.evaluate(()=>uiFixture.emitFriend('north',{altitude:412}));
+  assert.equal(await page.locator('[data-uid="north"]>.caption').innerText(),'更新情報なし');
+  await page.evaluate(()=>{const t=Date.now();uiFixture.emitFriend('north',{altitude:412,updatedAt:{toDate:()=>new Date(t)}});});
+  await page.clock.fastForward(60000);
+  assert.match(await page.locator('[data-uid="north"]>.caption').innerText(),/1分前/);
+  console.log('PASS polish: 相対日時・欠損表示・受信なしでも経過時間を更新');
   await page.evaluate(()=>uiFixture.emitFriend('north',{altitude:555,altitudeAccuracy:8,updatedAt:{toDate:()=>new Date(1700000006000)}}));
   assert.deepEqual(await order(),['north','east','quietA','quietB']);
   assert.match(await page.locator('[data-uid="north"]').innerText(),/高度精度.*8 m/);
@@ -81,7 +101,7 @@ const esbuild = require('esbuild');
   assert.equal(await page.locator('[data-uid="east"] .friend-altitude').innerText(),'—');
   console.log('PASS redesign: リアルタイム並べ替え・停止/キャッシュ/権限エラーで古い値と精度を消去');
   await page.evaluate(()=>uiFixture.seedFriends());
-  fs.mkdirSync('/workspace/hight-review/ui-compact',{recursive:true});
+  fs.mkdirSync('/workspace/hight-review/ui-polish',{recursive:true});
   const sizes=[[375,667],[390,844],[360,800],[412,915],[1280,900]];
   for(const [width,height] of sizes){
    await page.setViewportSize({width,height});
@@ -89,7 +109,7 @@ const esbuild = require('esbuild');
     await nav(screen);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${width} ${screen}`);
     const box=await page.locator('.bottom-nav').boundingBox();assert.ok(Math.abs(box.y+box.height-height)<1);
     if(screen==='home' && width<600){
-      for(const id of ['altitude','measure','share-altitude','stop-sharing','sharing-summary','sharing-state']){
+      for(const id of ['altitude','measure','share-altitude','stop-sharing','sharing-summary']){
         const b=await page.locator('#'+id).boundingBox();assert.ok(b.y>=0 && b.y+b.height<=box.y,`${width}x${height} ${id} must fit before nav (${JSON.stringify(b)}, nav ${box.y})`);
       }
       assert.equal(await page.locator('#sharing-details').evaluate(el=>el.open),false);
@@ -100,7 +120,7 @@ const esbuild = require('esbuild');
       assert.equal(await page.locator('#request-tools').evaluate(el=>el.open),false);
       if(width<600){for(const card of await page.locator('#friends-list>li').all()){assert.ok((await card.boundingBox()).height<=112);}}
     }
-    await page.screenshot({path:`/workspace/hight-review/ui-compact/${screen}-${width}x${height}.png`,fullPage:false});
+    await page.screenshot({path:`/workspace/hight-review/ui-polish/${screen}-${width}x${height}.png`,fullPage:false});
     await page.evaluate(()=>scrollTo(0,document.body.scrollHeight));
     const after=await page.locator('.bottom-nav').boundingBox();assert.ok(Math.abs(after.y-box.y)<1,'nav stays fixed when scrolling');
     assert.ok((await page.locator('footer').boundingBox()).y+(await page.locator('footer').boundingBox()).height<=after.y+1,'bottom content can clear nav');
@@ -118,15 +138,18 @@ const esbuild = require('esbuild');
   await nav('home');await page.locator('#sharing-details > summary').click();
   assert.match(await page.locator('#sharing-persistence-notice').innerText(),/閉じても.*共有停止/);
   await page.locator('#sharing-details > summary').click();
-  await page.locator('#sharing-toggle').uncheck();await page.locator('#sharing-summary').filter({hasText:'非公開（サーバー確認済み）'}).waitFor();
-  assert.match(await page.locator('#sharing-state').innerText(),/準備なし/);
+  await page.locator('#stop-sharing').click();await page.locator('#sharing-summary').filter({hasText:'非公開（サーバー確認済み）'}).waitFor();
+  assert.equal(await page.locator('#sharing-toggle').count(),0);
   await page.evaluate(()=>{uiFixture.ownError({code:'unavailable'});});
   assert.match(await page.locator('#sharing-summary').innerText(),/未確認.*停止済みとは限りません/);
+  await page.clock.fastForward(10000);assert.match(await page.locator('#social-feedback').innerText(),/サーバーに接続できません/);
   await page.evaluate(()=>{uiFixture.failStop=true;});await page.locator('#stop-sharing').click();
   assert.equal(await page.locator('#stop-warning').isVisible(),true);
   assert.match(await page.locator('#stop-warning').innerText(),/友達が読める可能性/);
-  await nav('friends');assert.equal(await page.locator('#stop-warning').isVisible(),true);
-  console.log('PASS compact: 共有状態と準備状態を分離・通信不明を非公開扱いせず停止失敗警告を常時表示');
+  await nav('friends');await page.clock.fastForward(30000);assert.equal(await page.locator('#stop-warning').isVisible(),true);
+  assert.match(await page.locator('#social-feedback').innerText(),/サーバーに接続できません/);
+  console.log('PASS polish: エラーと重要警告は時間経過で消さない');
+  console.log('PASS compact: 準備スイッチなしの手動共有・通信不明を非公開扱いせず停止失敗警告を常時表示');
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   assert.equal(await page.evaluate(()=>Object.keys(localStorage).some(k=>/history|diagnostic/i.test(k))),false);
   console.log('PASS redesign: 指定スマホ4サイズとPC全画面・下部ナビ・画面画像・外部通信/実行時エラーなし');

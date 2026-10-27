@@ -10,7 +10,8 @@
     "test:integration": "firebase emulators:exec --project demo-hight --only firestore,auth 'node tests/firebase-browser.cjs'",
     "test:auth": "firebase emulators:exec --project demo-hight --only auth 'node tests/auth-browser.cjs'",
     "test:ui": "node tests/social-ui.cjs",
-    "test:redesign": "node tests/redesign-ui.cjs"
+    "test:redesign": "node tests/redesign-ui.cjs",
+    "test:display": "node --test tests/social-display.cjs"
   },
   "dependencies": {
     "firebase": "13.1.0"

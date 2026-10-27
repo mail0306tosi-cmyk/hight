@@ -1,5 +1,7 @@
 # スマートフォン向けコンパクト化（ローカル・未公開）
 
+後続の通知・スイッチ削除・日時表示の最新結果は [UI_BEHAVIOR_REVIEW.md](UI_BEHAVIOR_REVIEW.md) を参照。
+
 基準: ローカル新UIコミット `41ed13783f1fa04a1272c2016794bfa771342b6a`。GitHub/Pages公開はしていない。Firebase設定・クライアント通信処理・Firestore本番ルール・Spark/課金は変更なし。
 
 ## 変更

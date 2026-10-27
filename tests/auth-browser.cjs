@@ -45,8 +45,8 @@ const { chromium } = require('playwright');
     console.log('PASS メール確認リンク適用・IDトークン更新後に共有UIを解放');
     await page.locator('#social-feedback').filter({ hasText: /アクセスが拒否|サーバーに接続/ }).waitFor({ timeout: 25000 });
     assert.equal(await page.locator('#share-altitude').isDisabled(), true);
-    assert.equal(await page.locator('#sharing-toggle').isChecked(), false);
-    console.log('PASS Firestore接続失敗の案内・未測定では共有不可・初期オフ');
+    assert.equal(await page.locator('#sharing-toggle').count(), 0);
+    console.log('PASS Firestore接続失敗の案内・未測定では共有不可・初期非公開');
     // 新しいコンテキストは未ログイン。確認済みアカウントのログインをテスト。
     const login = withScreens(await browser.newPage());
     await login.route('http://127.0.0.1:8080/**', route => route.abort());
