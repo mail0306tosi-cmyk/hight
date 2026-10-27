@@ -1,3 +1,4 @@
+const { withScreens } = require('./screen-navigation.cjs');
 // 実際のFirebase SDK + Auth/Firestoreエミュレーターによる2ブラウザー統合テスト。
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -44,7 +45,7 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
         clearWatch(id) { (watches.get(id) || []).forEach(clearTimeout); watches.delete(id); },
       } });
     });
-    const page = await context.newPage();
+    const page = withScreens(await context.newPage());
     page.on('pageerror', e => errors.push(e.message));
     page.on('request', req => { if (!req.url().startsWith('http://127.0.0.1:')) external.push(req.url()); });
     await page.goto(url);
@@ -132,7 +133,7 @@ const { doc, getDocFromServer: getDoc } = require('firebase/firestore');
     const beforeClose = await shareExists();
     await alice.page.close();
     assert.equal((await getDoc(doc(bobDb, 'shares', alice.uid))).data().altitude, 123);
-    alice.page = await alice.context.newPage();
+    alice.page = withScreens(await alice.context.newPage());
     alice.page.on('pageerror', e => errors.push(e.message));
     alice.page.on('request', req => { if (!req.url().startsWith('http://127.0.0.1:')) external.push(req.url()); });
     await alice.page.goto(url);

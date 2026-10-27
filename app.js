@@ -177,3 +177,30 @@ window.addEventListener("pagehide", () => cancel("画面を閉じたため測定
 document.addEventListener("visibilitychange", () => { if (document.hidden) cancel("画面が非表示になったため測定を停止しました。再測定してください。"); });
 statusText.textContent = "測定待機中：「高さを測定」を押してください";
 button.disabled = false;
+
+// ナビゲーションは画面表示だけを切り替える。測位や共有・履歴保存を開始しない。
+(() => {
+  const screens = [...document.querySelectorAll('[data-screen]')];
+  const nav = [...document.querySelectorAll('[data-nav]')];
+  function showScreen(name, focus = true) {
+    if (!screens.some(el => el.dataset.screen === name)) return;
+    screens.forEach(el => { el.hidden = el.dataset.screen !== name; });
+    nav.forEach(el => {
+      if (el.dataset.nav === name) el.setAttribute('aria-current', 'page');
+      else el.removeAttribute('aria-current');
+    });
+    if (focus) {
+      document.querySelector(`#screen-${name} h1`)?.focus({ preventScroll: true });
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }
+  nav.forEach(el => el.addEventListener('click', () => showScreen(el.dataset.nav)));
+  document.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => showScreen(el.dataset.go)));
+  document.querySelectorAll('[data-open-diagnostic]').forEach(el => el.addEventListener('click', () => {
+    showScreen('settings', false);
+    document.querySelector('#diagnostic').open = true;
+    document.querySelector('#diagnostic summary').focus();
+    document.querySelector('#diagnostic').scrollIntoView({ block: 'start' });
+  }));
+  showScreen('home', false);
+})();

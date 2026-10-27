@@ -1,3 +1,4 @@
+const { withScreens } = require('./screen-navigation.cjs');
 // UIの操作テスト。Firebaseクライアントは模擬。サーバールールの検証ではない。
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -17,7 +18,7 @@ const esbuild = require('esbuild');
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] });
   try {
-    const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+    const page = withScreens(await browser.newPage({ viewport: { width: 375, height: 812 } }));
     const errors = [], requests = [];
     page.on('pageerror', e => errors.push(e.message)); page.on('request', r => requests.push(r.url()));
     await page.addInitScript(() => {

@@ -1,3 +1,4 @@
+const { withScreens } = require('./screen-navigation.cjs');
 // 本番と同じHTMLをChromiumで測定。Geolocationのみ模擬、仮想時計で20秒を検証。
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
@@ -7,7 +8,7 @@ const baseURL = process.env.HIGHT_TEST_URL || 'http://127.0.0.1:8000';
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] });
   let count = 0;
   async function scenario(name, options, body) {
-    const page = await browser.newPage({ viewport: { width: 375, height: 812 }, isMobile: true });
+    const page = withScreens(await browser.newPage({ viewport: { width: 375, height: 812 }, isMobile: true }));
     const errors = [], external = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('request', r => { if (!r.url().startsWith(baseURL + '/')) external.push(r.url()); });

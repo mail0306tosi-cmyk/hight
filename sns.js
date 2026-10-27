@@ -26,10 +26,14 @@ import { createClient } from './firebase-client.js';
     };
     return messages[error.code] || (error.code ? '処理に失敗しました。再度お試しください。' : error.message);
   }
+  function showVerified(show) {
+    document.querySelectorAll('[data-verified]').forEach(el => { el.hidden = !show; });
+    document.querySelectorAll('[data-guest]').forEach(el => { el.hidden = show; });
+  }
   function controls() {
     $('#login').disabled = $('#register').disabled = !client || busy;
     $('#account-card').querySelectorAll('button').forEach(el => { el.disabled = busy; });
-    $('#verified-features').querySelectorAll('button,input').forEach(el => { el.disabled = !verified || busy; });
+    document.querySelectorAll('[data-verified] button,[data-verified] input').forEach(el => { el.disabled = !verified || busy; });
     $('#share-altitude').disabled = !verified || busy || privacyLock || !latest || !$('#sharing-toggle').checked;
     $('#sharing-state').textContent = $('#sharing-toggle').checked ? '準備あり（送信は手動）' : '準備なし（共有停止ではありません）';
   }
@@ -87,11 +91,25 @@ import { createClient } from './firebase-client.js';
       li.append(actionButton('申請を削除', async () => { await client.removeFriend(item.id); feedback('申請を削除しました。'); }));
       $('#requests-list').append(li);
     }
+    const cards = [];
+    const collator = new Intl.Collator('ja');
+    const reorder = () => {
+      cards.sort((a, b) => Number(b.shared) - Number(a.shared) ||
+        (a.shared && b.shared ? b.updated - a.updated : 0) ||
+        collator.compare(a.name.textContent, b.name.textContent) || a.uid.localeCompare(b.uid));
+      for (const card of cards) $('#friends-list').append(card.li);
+    };
     for (const item of accepted) {
       const other = item.sender === current.uid ? item.recipient : item.sender;
       const li = document.createElement('li'), name = document.createElement('strong'), details = document.createElement('p');
       name.textContent = '友達'; details.className = 'caption'; details.textContent = '標高をサーバーで確認中…';
-      li.append(name, details, actionButton('友達を解除', async () => {
+      li.className = 'friend-card'; li.dataset.uid = other; li.dataset.shared = 'false';
+      const top = document.createElement('div'), state = document.createElement('span'), reading = document.createElement('p');
+      top.className = 'friend-top'; state.className = 'friend-state'; state.textContent = '確認中';
+      reading.className = 'friend-altitude'; reading.textContent = '—';
+      top.append(name, state);
+      const card = { li, name, uid: other, shared: false, updated: 0 }; cards.push(card);
+      li.append(top, reading, details, actionButton('友達を解除', async () => {
         await client.removeFriend(item.id); li.remove(); feedback('友達を解除しました。お互いの標高にアクセスできなくなりました。');
       }));
       $('#friends-list').append(li);
@@ -99,17 +117,29 @@ import { createClient } from './firebase-client.js';
       // 停止/権限失効の通知で表示済みの値も消す。キャッシュの値は表示しない。
       friendSubscriptions.push(client.watchShare(other, (share, confirmed) => {
         if (!active()) return;
+        card.shared = !!(confirmed && share && Number.isFinite(share.altitude));
+        const updated = share?.updatedAt?.toDate?.().getTime();
+        card.updated = card.shared && Number.isFinite(updated) ? updated : 0;
+        li.dataset.shared = String(card.shared);
+        reading.textContent = card.shared ? `${format(share.altitude)} m` : '—';
+        state.textContent = !confirmed ? '確認中' : card.shared ? '共有中' : '非公開';
         details.textContent = !confirmed ? 'サーバー確認待ちです。以前の標高は表示しません。'
-          : share ? `${format(share.altitude)} m ／ 最終共有：${date(share.updatedAt)} ／ 測定：${date(share.measuredAt)}（サーバー確認済み）`
+          : card.shared ? `最終共有：${date(share.updatedAt)} ／ 測定：${date(share.measuredAt)}（サーバー確認済み）${Number.isFinite(share.altitudeAccuracy) && share.altitudeAccuracy >= 0 ? ` ／ 高度精度（報告値）：±${share.altitudeAccuracy} m` : ''}`
           : '共有停止中・標高は非公開';
+        reorder();
       }, () => {
-        if (active()) details.textContent = '標高を取得できません。共有停止・友達解除・通信状態を確認してください。再開後は更新ボタンを押してください。';
+        if (active()) {
+          card.shared = false; card.updated = 0; li.dataset.shared = 'false';
+          reading.textContent = '—'; state.textContent = '確認不可';
+          details.textContent = '標高を取得できません。共有停止・友達解除・通信状態を確認してください。再開後は更新ボタンを押してください。';
+          reorder();
+        }
       }));
       try {
         const profile = await client.profile(other);
         if (!active()) return;
-        name.textContent = profile?.nickname || '友達';
-      } catch { if (active()) name.textContent = '友達（プロフィール取得不可）'; }
+        name.textContent = profile?.nickname || '友達'; reorder();
+      } catch { if (active()) { name.textContent = '友達（プロフィール取得不可）'; reorder(); } }
 
     }
     controls();
@@ -119,7 +149,7 @@ import { createClient } from './firebase-client.js';
     const currentGeneration = ++generation;
     unsubscribe(); unsubscribeOwn(); unsubscribe = () => {}; unsubscribeOwn = () => {}; verified = false; user = nextUser; latest = null; connections = [];
     emptyList(); if (!sameUser) { privacyLock = false; $('#stop-warning').hidden = true; } $('#sharing-toggle').checked = false;
-    $('#auth-card').hidden = !!user; $('#account-card').hidden = !user; $('#verified-features').hidden = true;
+    $('#auth-card').hidden = !!user; $('#account-card').hidden = !user; showVerified(false);
     $('#share-hint').textContent = 'サーバーの共有状態は未確認です。まだ送信していません。';
     $('#nickname').value = ''; $('#invite-code').textContent = 'プロフィールを保存すると発行されます';
     $('#password').value = ''; controls();
@@ -131,7 +161,7 @@ import { createClient } from './firebase-client.js';
       if (currentGeneration !== generation) return;
       verified = !!result;
       $('#verification-state').textContent = verified ? 'メールアドレス確認済み' : 'メール未確認：共有・友達申請は利用できません。';
-      $('#verified-features').hidden = !verified; $('#resend-verification').hidden = verified;
+      showVerified(verified); $('#resend-verification').hidden = verified;
       $('#connection-status').textContent = verified ? 'Firebaseに接続しました。標高の送信は共有ボタンを押した時だけです。' : '確認メールのリンクを開き、確認状態を更新してください。';
       controls();
       if (!verified) return;

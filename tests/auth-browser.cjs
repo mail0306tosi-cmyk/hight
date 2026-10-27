@@ -1,3 +1,4 @@
+const { withScreens } = require('./screen-navigation.cjs');
 // Firestoreに接続せず、実際のFirebase SDK + Authエミュレーターだけを検証する。
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -13,7 +14,7 @@ const { chromium } = require('playwright');
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${server.address().port}/`;
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] });
-  const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  const page = withScreens(await browser.newPage({ viewport: { width: 375, height: 812 } }));
   const errors = [], external = [], outsideResponses = [];
   await page.addInitScript(() => { window.cspViolations = []; document.addEventListener('securitypolicyviolation', event => window.cspViolations.push({ uri: event.blockedURI, directive: event.effectiveDirective })); });
   page.on('pageerror', e => errors.push(e.message));
@@ -47,7 +48,7 @@ const { chromium } = require('playwright');
     assert.equal(await page.locator('#sharing-toggle').isChecked(), false);
     console.log('PASS Firestore接続失敗の案内・未測定では共有不可・初期オフ');
     // 新しいコンテキストは未ログイン。確認済みアカウントのログインをテスト。
-    const login = await browser.newPage();
+    const login = withScreens(await browser.newPage());
     await login.route('http://127.0.0.1:8080/**', route => route.abort());
     await login.goto(url);
     await login.locator('#email').fill(email); await login.locator('#password').fill('wrong-pass-123');
