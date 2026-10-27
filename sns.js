@@ -8,6 +8,13 @@ import { createClient } from './firebase-client.js';
   const feedback = message => { $('#social-feedback').textContent = message; };
   const date = timestamp => timestamp?.toDate ? timestamp.toDate().toLocaleString('ja-JP') : '不明';
   const format = n => new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(n);
+  function setShareStatus(message) {
+    $('#share-hint').textContent = message;
+    const shared = message.match(/^(?:サーバーで)?共有中：([^（。]+? m)/);
+    $('#sharing-summary').textContent = shared ? `共有中：${shared[1]}（停止するまで継続）`
+      : /^(共有停止済み|サーバー上の共有値はありません)/.test(message) ? '非公開（サーバー確認済み）'
+      : '共有状態：未確認（停止済みとは限りません）';
+  }
   function explain(error) {
     const messages = {
       'auth/email-already-in-use': 'このメールアドレスでは登録できません。ログインをお試しください。',
@@ -62,6 +69,7 @@ import { createClient } from './firebase-client.js';
     renderGeneration++;
     friendSubscriptions.forEach(stop => stop()); friendSubscriptions = [];
     $('#friends-list').replaceChildren(); $('#requests-list').replaceChildren();
+    $('#requests-summary').textContent = '申請管理（0件）';
     $('#friends-empty').hidden = false;
     $('#friends-empty').textContent = '承認済みの友達はいません。';
   }
@@ -76,7 +84,9 @@ import { createClient } from './firebase-client.js';
     if (!verified || !current) return;
     const accepted = connections.filter(item => item.status === 'accepted');
     $('#friends-empty').hidden = accepted.length > 0;
-    for (const item of connections.filter(item => item.status !== 'accepted')) {
+    const pending = connections.filter(item => item.status !== 'accepted');
+    $('#requests-summary').textContent = `申請管理（${pending.length}件）`;
+    for (const item of pending) {
       const li = document.createElement('li'), label = document.createElement('p');
       label.className = 'caption';
       const incoming = item.recipient === current.uid;
@@ -109,9 +119,13 @@ import { createClient } from './firebase-client.js';
       reading.className = 'friend-altitude'; reading.textContent = '—';
       top.append(name, state);
       const card = { li, name, uid: other, shared: false, updated: 0 }; cards.push(card);
-      li.append(top, reading, details, actionButton('友達を解除', async () => {
+      const menu = document.createElement('details'), menuLabel = document.createElement('summary'), extra = document.createElement('p');
+      menu.className = 'friend-menu'; menu.id = `friend-menu-${cards.length}`;
+      menuLabel.textContent = '⋯'; menuLabel.setAttribute('aria-label', '友達の操作');
+      menu.append(menuLabel, extra, actionButton('友達を解除', async () => {
         await client.removeFriend(item.id); li.remove(); feedback('友達を解除しました。お互いの標高にアクセスできなくなりました。');
       }));
+      li.append(top, reading, details, menu);
       $('#friends-list').append(li);
       const active = () => session === generation && rendering === renderGeneration;
       // 停止/権限失効の通知で表示済みの値も消す。キャッシュの値は表示しない。
@@ -124,13 +138,14 @@ import { createClient } from './firebase-client.js';
         reading.textContent = card.shared ? `${format(share.altitude)} m` : '—';
         state.textContent = !confirmed ? '確認中' : card.shared ? '共有中' : '非公開';
         details.textContent = !confirmed ? 'サーバー確認待ちです。以前の標高は表示しません。'
-          : card.shared ? `最終共有：${date(share.updatedAt)} ／ 測定：${date(share.measuredAt)}（サーバー確認済み）${Number.isFinite(share.altitudeAccuracy) && share.altitudeAccuracy >= 0 ? ` ／ 高度精度（報告値）：±${share.altitudeAccuracy} m` : ''}`
+          : card.shared ? `更新：${date(share.updatedAt)}${Number.isFinite(share.altitudeAccuracy) && share.altitudeAccuracy >= 0 ? ` ／ 高度精度（報告値）：±${share.altitudeAccuracy} m` : ''}`
           : '共有停止中・標高は非公開';
+        extra.textContent = card.shared ? `測定：${date(share.measuredAt)}（サーバー確認済み）。共有値は参考高度です。` : '';
         reorder();
       }, () => {
         if (active()) {
           card.shared = false; card.updated = 0; li.dataset.shared = 'false';
-          reading.textContent = '—'; state.textContent = '確認不可';
+          reading.textContent = '—'; state.textContent = '確認不可'; extra.textContent = '';
           details.textContent = '標高を取得できません。共有停止・友達解除・通信状態を確認してください。再開後は更新ボタンを押してください。';
           reorder();
         }
@@ -138,7 +153,7 @@ import { createClient } from './firebase-client.js';
       try {
         const profile = await client.profile(other);
         if (!active()) return;
-        name.textContent = profile?.nickname || '友達'; reorder();
+        name.textContent = profile?.nickname || '友達'; menuLabel.setAttribute('aria-label', `${name.textContent}の操作`); reorder();
       } catch { if (active()) { name.textContent = '友達（プロフィール取得不可）'; reorder(); } }
 
     }
@@ -150,7 +165,7 @@ import { createClient } from './firebase-client.js';
     unsubscribe(); unsubscribeOwn(); unsubscribe = () => {}; unsubscribeOwn = () => {}; verified = false; user = nextUser; latest = null; connections = [];
     emptyList(); if (!sameUser) { privacyLock = false; $('#stop-warning').hidden = true; } $('#sharing-toggle').checked = false;
     $('#auth-card').hidden = !!user; $('#account-card').hidden = !user; showVerified(false);
-    $('#share-hint').textContent = 'サーバーの共有状態は未確認です。まだ送信していません。';
+    setShareStatus('サーバーの共有状態は未確認です。まだ送信していません。');
     $('#nickname').value = ''; $('#invite-code').textContent = 'プロフィールを保存すると発行されます';
     $('#password').value = ''; controls();
     if (!user) { $('#connection-status').textContent = 'ログインしなくても標高を測定できます。共有にはログインとメール確認が必要です。'; return; }
@@ -167,12 +182,12 @@ import { createClient } from './firebase-client.js';
       if (!verified) return;
       unsubscribeOwn = client.watchShare(user.uid, (shared, confirmed) => {
         if (currentGeneration !== generation) return;
-        $('#share-hint').textContent = !confirmed ? 'サーバーの共有状態を確認中です。'
+        setShareStatus(!confirmed ? 'サーバーの共有状態を確認中です。'
           : shared ? `サーバーで共有中：${format(shared.altitude)} m（最終共有：${date(shared.updatedAt)}）。${sharingNotice}`
-          : 'サーバー上の共有値はありません。非公開です。';
+          : 'サーバー上の共有値はありません。非公開です。');
       }, error => {
         if (currentGeneration === generation) {
-          $('#share-hint').textContent = 'サーバーの共有状態を確認できません。停止済みとは確認できていません。';
+          setShareStatus('サーバーの共有状態を確認できません。停止済みとは確認できていません。');
           feedback(explain(error));
         }
       });
@@ -225,7 +240,7 @@ import { createClient } from './firebase-client.js';
     const confirmed = () => {
       if (epoch !== generation || user?.uid !== uid) return;
       privacyLock = false; $('#stop-warning').hidden = true; $('#sharing-toggle').checked = false;
-      $('#share-hint').textContent = '共有停止済み：サーバーの標高を削除しました。';
+      setShareStatus('共有停止済み：サーバーの標高を削除しました。');
       feedback('共有を停止しました。友達はサーバーから標高を取得できません。'); controls();
     };
     try { await awaitWrite(client.stop(uid), confirmed); confirmed(); }
@@ -247,7 +262,7 @@ import { createClient } from './firebase-client.js';
           privacyLock = true; warnStop('前の共有操作が遅れてサーバーへ反映されました。最後の標高を友達が読める可能性があります。止めるには「共有停止」を押してください。'); controls();
         });
       } catch (error) { privacyLock = true; warnStop(); throw error; }
-      $('#share-hint').textContent = `共有中：${format(snapshot.altitude)} m。${sharingNotice}`;
+      setShareStatus(`共有中：${format(snapshot.altitude)} m。${sharingNotice}`);
       feedback('標高を共有しました。承認済みの友達だけが閲覧できます。');
     });
   });

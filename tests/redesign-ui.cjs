@@ -39,10 +39,17 @@ const esbuild = require('esbuild');
   await page.locator('#email').fill('alice@example.com');await page.locator('#password').fill('Test-pass-123');await page.locator('#register').click();
   await page.locator('#account-card').waitFor();await page.locator('#refresh-verification').click();
   await page.locator('#nickname').fill('ユウ');await page.locator('#profile-form button').click();
-  await nav('friends');await page.locator('#invite-code').filter({hasText:'A'.repeat(32)}).waitFor();
-  assert.equal(await page.locator('#nickname').isVisible(),false);
+  await nav('friends');await page.locator('#friend-tools > summary').click();await page.locator('#invite-code').filter({hasText:'A'.repeat(32)}).waitFor();
+  assert.equal(await page.locator('#nickname').isVisible(),false);await page.locator('#friend-tools > summary').click();
   console.log('PASS redesign: 設定でログイン/確認/プロフィール・友達画面に本人招待コード・診断導線');
-  await nav('home');await page.clock.install();await page.locator('#measure').click();
+  await nav('home');await page.setViewportSize({width:375,height:667});
+  const assertCoreFits = async (ids) => {
+    const navBox = await page.locator('.bottom-nav').boundingBox();
+    for (const id of ids) { const b = await page.locator('#'+id).boundingBox(); assert.ok(b.y>=0 && b.y+b.height<=navBox.y, `${id} fits initial viewport`); }
+  };
+  await assertCoreFits(['altitude','measure','share-altitude','stop-sharing']);
+  await page.clock.install();await page.locator('#measure').click();
+  await assertCoreFits(['altitude','measure','cancel-measure','share-altitude','stop-sharing']);
   for(let i=0;i<8;i++){
    await page.clock.fastForward(1000);
    await page.evaluate(()=>{const coords={altitude:128,altitudeAccuracy:4,accuracy:9};for(const k of ['latitude','longitude'])Object.defineProperty(coords,k,{get(){throw Error('coordinates read');}});emitSample({coords,timestamp:Date.now()});});
@@ -51,7 +58,7 @@ const esbuild = require('esbuild');
   assert.equal(await page.locator('#altitude').innerText(),'128');assert.equal(await page.evaluate(()=>cleared),1);
   assert.equal(await page.evaluate(()=>uiFixture.calls.filter(c=>c[0]==='share').length),0);
   await page.locator('#sharing-toggle').check();await page.locator('#share-altitude').click();
-  await page.locator('#share-hint').filter({hasText:'共有中：128 m'}).waitFor();
+  await page.locator('#sharing-summary').filter({hasText:'共有中：128 m'}).waitFor();
   assert.deepEqual(await page.evaluate(()=>Object.keys(uiFixture.calls.find(c=>c[0]==='share')[1]).sort()),['altitude','timestamp']);
   console.log('PASS redesign: 画面移動中の測定/診断維持・手動共有のみ・精度/座標を共有しない');
   await page.evaluate(()=>uiFixture.seedFriends());await nav('friends');
@@ -74,17 +81,54 @@ const esbuild = require('esbuild');
   assert.equal(await page.locator('[data-uid="east"] .friend-altitude').innerText(),'—');
   console.log('PASS redesign: リアルタイム並べ替え・停止/キャッシュ/権限エラーで古い値と精度を消去');
   await page.evaluate(()=>uiFixture.seedFriends());
-  fs.mkdirSync('/workspace/hight-review/ui-redesign',{recursive:true});
-  for(const width of [320,390,768,1280]){
-   await page.setViewportSize({width,height:900});
+  fs.mkdirSync('/workspace/hight-review/ui-compact',{recursive:true});
+  const sizes=[[375,667],[390,844],[360,800],[412,915],[1280,900]];
+  for(const [width,height] of sizes){
+   await page.setViewportSize({width,height});
    for(const screen of ['home','friends','history','settings']){
     await nav(screen);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${width} ${screen}`);
-    const box=await page.locator('.bottom-nav').boundingBox();assert.ok(box.y+box.height<=900);
-    if(width===390||width===1280)await page.screenshot({path:`/workspace/hight-review/ui-redesign/${screen}-${width}.png`,fullPage:true});
+    const box=await page.locator('.bottom-nav').boundingBox();assert.ok(Math.abs(box.y+box.height-height)<1);
+    if(screen==='home' && width<600){
+      for(const id of ['altitude','measure','share-altitude','stop-sharing','sharing-summary','sharing-state']){
+        const b=await page.locator('#'+id).boundingBox();assert.ok(b.y>=0 && b.y+b.height<=box.y,`${width}x${height} ${id} must fit before nav (${JSON.stringify(b)}, nav ${box.y})`);
+      }
+      assert.equal(await page.locator('#sharing-details').evaluate(el=>el.open),false);
+      assert.equal(await page.locator('#measurement-details').evaluate(el=>el.open),false);
+    }
+    if(screen==='friends'){
+      assert.equal(await page.locator('#friend-tools').evaluate(el=>el.open),false);
+      assert.equal(await page.locator('#request-tools').evaluate(el=>el.open),false);
+      if(width<600){for(const card of await page.locator('#friends-list>li').all()){assert.ok((await card.boundingBox()).height<=112);}}
+    }
+    await page.screenshot({path:`/workspace/hight-review/ui-compact/${screen}-${width}x${height}.png`,fullPage:false});
+    await page.evaluate(()=>scrollTo(0,document.body.scrollHeight));
+    const after=await page.locator('.bottom-nav').boundingBox();assert.ok(Math.abs(after.y-box.y)<1,'nav stays fixed when scrolling');
+    assert.ok((await page.locator('footer').boundingBox()).y+(await page.locator('footer').boundingBox()).height<=after.y+1,'bottom content can clear nav');
    }
   }
+  console.log('PASS compact: 375×667/390×844/Android 360×800・412×915で主要操作が初期画面内');
+  await page.setViewportSize({width:375,height:667});await nav('home');
+  await page.evaluate(()=>{document.querySelector('.bottom-nav').style.paddingBottom='38px';document.querySelector('.app').style.paddingBottom='130px';});
+  await assertCoreFits(['altitude','measure','share-altitude','stop-sharing']);
+  await page.evaluate(()=>scrollTo(0,document.body.scrollHeight));
+  const safeNav=await page.locator('.bottom-nav').boundingBox(), safeFooter=await page.locator('footer').boundingBox();
+  assert.ok(safeFooter.y+safeFooter.height<=safeNav.y);
+  await page.evaluate(()=>{document.querySelector('.bottom-nav').style.paddingBottom='';document.querySelector('.app').style.paddingBottom='';});
+  console.log('PASS compact: カード112px以下・招待/申請折りたたみ・スクロール中ナビ固定・最下部余白');
+  await nav('home');await page.locator('#sharing-details > summary').click();
+  assert.match(await page.locator('#sharing-persistence-notice').innerText(),/閉じても.*共有停止/);
+  await page.locator('#sharing-details > summary').click();
+  await page.locator('#sharing-toggle').uncheck();await page.locator('#sharing-summary').filter({hasText:'非公開（サーバー確認済み）'}).waitFor();
+  assert.match(await page.locator('#sharing-state').innerText(),/準備なし/);
+  await page.evaluate(()=>{uiFixture.ownError({code:'unavailable'});});
+  assert.match(await page.locator('#sharing-summary').innerText(),/未確認.*停止済みとは限りません/);
+  await page.evaluate(()=>{uiFixture.failStop=true;});await page.locator('#stop-sharing').click();
+  assert.equal(await page.locator('#stop-warning').isVisible(),true);
+  assert.match(await page.locator('#stop-warning').innerText(),/友達が読める可能性/);
+  await nav('friends');assert.equal(await page.locator('#stop-warning').isVisible(),true);
+  console.log('PASS compact: 共有状態と準備状態を分離・通信不明を非公開扱いせず停止失敗警告を常時表示');
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   assert.equal(await page.evaluate(()=>Object.keys(localStorage).some(k=>/history|diagnostic/i.test(k))),false);
-  console.log('PASS redesign: 320/390/768/1280px全画面・下部ナビ・画面画像・外部通信/実行時エラーなし');
+  console.log('PASS redesign: 指定スマホ4サイズとPC全画面・下部ナビ・画面画像・外部通信/実行時エラーなし');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

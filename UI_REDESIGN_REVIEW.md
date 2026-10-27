@@ -1,5 +1,7 @@
 # HIGHT UIリニューアル（ローカル・未公開）
 
+後続のコンパクト化の最新結果は [UI_COMPACT_REVIEW.md](UI_COMPACT_REVIEW.md) を参照。
+
 ## 基準と範囲
 
 2026-10-27、GitHub mainを読み取りfetchして `7ad1179bf8c2d6e7b0374eafb8cc84a6dfa7a86d` と一致を確認した上で、ローカルブランチ `feature/futuristic-ui` で実装。参考画像はこの会話の実行コンテキストにはなく、ユーザー指定の配色と「近未来 × アウトドア」を基にデザインした。
